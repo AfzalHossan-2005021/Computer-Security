@@ -1,3 +1,7 @@
+import sys
+sys.path.append("./BitVector-3.5.0/BitVector")
+from BitVector import *
+
 LEFT = 0
 RIGHT = 1
 WORD_SIZE = 4
@@ -39,6 +43,57 @@ InvSbox = (
     0xA0, 0xE0, 0x3B, 0x4D, 0xAE, 0x2A, 0xF5, 0xB0, 0xC8, 0xEB, 0xBB, 0x3C, 0x83, 0x53, 0x99, 0x61,
     0x17, 0x2B, 0x04, 0x7E, 0xBA, 0x77, 0xD6, 0x26, 0xE1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0C, 0x7D,
 )
+
+# Function to convert a string to a bit vector
+def convet_to_bitvector(key: str):
+    # Convert key to bytes
+    return [BitVector(textstring=char) for char in key]
+
+# Function to convert a bit vector to a string
+def print_bitvector_as_ascii(key: list):
+    for bitvector in key:
+        # Convert each byte to its ASCII representation
+        print(bitvector.get_bitvector_in_ascii(), end="")
+    print()
+
+# Function to convert a bit vector to a hex string
+def print_bitvector_as_hex(key: list):
+    for bitvector in key:
+        # Convert each byte to its hex representation
+        print(bitvector.get_bitvector_in_hex(), end=" ")
+    print()
+
+# Padding function to ensure the key is a multiple of 16 bytes
+def pad_text(plain_text: list):
+    # Pad the text to be a multiple of 16 bytes
+    block_size = 16
+    padding_length = block_size - (len(plain_text) % block_size)
+    # Pad with the length of the padding
+    padding = [BitVector(intVal=padding_length, size=8)] * padding_length
+    # Append the padding to the plaintext
+    text = plain_text + padding
+
+    return text
+
+# Take input key and plaintext
+def input_and_preprocess():
+    key = input("Key:\nIn ASCII: ")
+    key = convet_to_bitvector(key)
+    print("In HEX:", end=" ")
+    print_bitvector_as_hex(key)
+    print()
+    plain_text = input("Plain Text:\nIn ASCII: ")
+    plain_text = convet_to_bitvector(plain_text)
+    print("In HEX:", end=" ")
+    print_bitvector_as_hex(plain_text)
+    plain_text = pad_text(plain_text)
+    print("In ASCII(after padding):", end=" ")
+    print_bitvector_as_ascii(plain_text)
+    print("In HEX(after padding):", end=" ")
+    print_bitvector_as_hex(plain_text)
+    print()
+    # Pad the plaintext
+    return key, plain_text
 
 # Function to get the number of rounds for AES based on key length
 def get_round_counts(key_length: int):
@@ -141,38 +196,13 @@ def key_schedule(key: str, round_key_count: int, round_constants: list):
 
     return round_keys
     
-# Example usage
 if __name__ == "__main__":
-    key = 'Thats my Kung Fu'
-    key = [ord(c) for c in key]
-    key_length = len(key) * 8
-    round_count = get_round_counts(key_length)
-    round_key_count = round_count + 1
-    round_constants_count = (round_count * 4) // (key_length // 32)
-    round_constants = generate_round_constants(round_constants_count)
+    key, plain_text = input_and_preprocess()
+    # key_length = len(key) * 8
+    # round_count = get_round_counts(key_length)
+    # round_key_count = round_count + 1
+    # round_constants_count = (round_count * 4) // (key_length // 32)
+    # round_constants = generate_round_constants(round_constants_count)
 
-    round_keys = key_schedule(key, round_key_count, round_constants)
-
-    print("AES Round Keys:")
-    for i in range(round_key_count):
-        print(f"Round {i}:", end=" ")
-        # transpose the round key to print sequentially
-        round_key = [list(x) for x in zip(*round_keys[i])]
-        for j in range(4):
-            for k in range(4):
-                print(f"{round_key[j][k]:02x}", end=" ")
-        print()
-
-# Expected output:
-# AES Round Keys:
-# Round 0: 54 68 61 74 73 20 6d 79 20 4b 75 6e 67 20 46 75 
-# Round 1: e2 32 fc f1 91 12 91 88 b1 59 e4 e6 d6 79 a2 93 
-# Round 2: 56 08 20 07 c7 1a b1 8f 76 43 55 69 a0 3a f7 fa 
-# Round 3: d2 60 0d e7 15 7a bc 68 63 39 e9 01 c3 03 1e fb 
-# Round 4: a1 12 02 c9 b4 68 be a1 d7 51 57 a0 14 52 49 5b 
-# Round 5: b1 29 3b 33 05 41 85 92 d2 10 d2 32 c6 42 9b 69 
-# Round 6: bd 3d c2 87 b8 7c 47 15 6a 6c 95 27 ac 2e 0e 4e 
-# Round 7: cc 96 ed 16 74 ea aa 03 1e 86 3f 24 b2 a8 31 6a 
-# Round 8: 8e 51 ef 21 fa bb 45 22 e4 3d 7a 06 56 95 4b 6c 
-# Round 9: bf e2 bf 90 45 59 fa b2 a1 64 80 b4 f7 f1 cb d8 
-# Round 10: 28 fd de f8 6d a4 24 4a cc c0 a4 fe 3b 31 6f 26
+    # round_keys = key_schedule(key, round_key_count, round_constants)
+    # print(round_keys)
