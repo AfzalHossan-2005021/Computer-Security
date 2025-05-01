@@ -2,6 +2,9 @@ from BitVector import *
 import sys
 sys.path.append("./BitVector-3.5.0/BitVector")
 import random
+import multiprocessing
+from concurrent.futures import ProcessPoolExecutor
+import time
 
 LEFT = 0
 RIGHT = 1
@@ -9,6 +12,8 @@ WORD_SIZE = 4
 WORD_PER_KEY = 4
 BLOCK_SIZE = 16
 AES_modulus = BitVector(bitstring='100011011') # AES modulus
+
+key_schedule_time = 0
 
 # For CTR mode padding is not required
 PADDING=False
@@ -66,10 +71,11 @@ InvMixer = [
     [BitVector(hexstring="0B"), BitVector(hexstring="0D"), BitVector(hexstring="09"), BitVector(hexstring="0E")]
 ]
 
+# Check if the key length is valid (in bytes)
 def check_key_validity(key: str):
-    # Check if the key length is valid
-    if len(key) * 8 != 128 and len(key) != 192 and len(key) != 256:
-        raise ValueError("Key length must be 128, 192, or 256 bits.")
+    key_length_bits = len(key) * 8  # Convert bytes to bits
+    if key_length_bits not in [128, 192, 256]:
+        raise ValueError(f"Key length must be 128, 192, or 256 bits. Your key is {key_length_bits} bits ({len(key)} bytes).")
 
 # Function to convert a string to a bit vector
 def convet_string_to_bitvector(string: str):
@@ -197,7 +203,7 @@ def substitute_word(word: list[BitVector]):
 
 def XOR(a: list[BitVector], b: list[BitVector]):
     # XOR two lists of bytes
-    return [a[i] ^ b[i] for i in range(len(a))]
+    return [a[i] ^ b[i] for i in range(min(len(a), len(b)))]
 
 # Key schedule function
 def key_schedule(key: list[BitVector]):
@@ -369,32 +375,49 @@ def create_counter_block(nonce: list[BitVector], counter: int) -> list[BitVector
     counter_block = nonce_part + counter_part
     return counter_block
 
+# Define function to operate on a single block
+def single_block_operations(args):
+    # Unpack arguments
+    block_data, round_keys, nonce = args
+    
+    # Create counter block
+    counter_value, block = block_data
+    counter_block = create_counter_block(nonce, counter_value)
+    
+    # Encrypt counter
+    encrypted_counter = encrypt_block(counter_block, round_keys)
+    
+    # XOR with plaintext
+    encrypted_block = XOR(block, encrypted_counter)
+    return encrypted_block
+
 # Utility function for encrypting and decrypting
 def encrypt_decrypt(key_bitvector: list[BitVector], text_bitvector: list[BitVector], nonce: list[BitVector]):
     # Determine the round keys
+    start_time = time.time()
     round_keys = key_schedule(key_bitvector)
+    end_time = time.time()
+    global key_schedule_time
+    key_schedule_time = (end_time - start_time) * 1000
 
-    # Divide the plaintext into 16 byte blocks
-    plain_text_blocks = []
+    # Divide the plaintext into 16 byte blocks and prepare args for each block
+    block_args = []
     for i in range(0, len(text_bitvector), BLOCK_SIZE):
-        block = text_bitvector[i:((i + BLOCK_SIZE) if i + BLOCK_SIZE < len(text_bitvector) else len(text_bitvector))]
-
-        # Append the block to the list
-        plain_text_blocks.append(block)
+        block = text_bitvector[i : min(i + BLOCK_SIZE, len(text_bitvector))]
+        # Enumerate each block with its position (becomes the counter)
+        block_data = (i // BLOCK_SIZE, block)
+        # Each task gets the block, the round keys, and the nonce
+        block_args.append((block_data, round_keys, nonce))
+    
+    # Use a process pool to parallelize encryption
+    num_cores = multiprocessing.cpu_count()
 
     # store the encrypted blocks
     encrypted_blocks = []
 
-    # Encrypt each block using CTR mode
-    for i, block in enumerate(plain_text_blocks):
-        # Create a counter block
-        nonce_counter_block = create_counter_block(nonce, i)
-        # Encrypt the counter block
-        encrypted_counter_block = encrypt_block(nonce_counter_block, round_keys)
-        # XOR the plaintext block with the encrypted counter block
-        encrypted_block = XOR(block, encrypted_counter_block)
-        # Append the encrypted block to the list
-        encrypted_blocks.append(encrypted_block)
+    # Parallelization using ProcessPoolExecutor
+    with ProcessPoolExecutor(max_workers=num_cores) as executor:
+        encrypted_blocks = list(executor.map(single_block_operations, block_args))
 
     # convert the encrypted blocks to a single list
     cipher_text_bitvector = [bit for block in encrypted_blocks for bit in block]
@@ -449,7 +472,20 @@ def decrypt_ciphered_text(key: str, cipher_text: list[BitVector]):
     return plain_text_bitvector
         
 if __name__ == "__main__":
-    key = "BUET CSE20 Batch"
-    plain_text = "We need picnic on 20th October as a part of our CSE20 batch activities. After that we will go to Cox's Bazar. We will have a lot of fun there. We will go to the beach and enjoy the sea. We will also visit some historical places. We will have a lot of fun."
+    key = input("Enter the key (128, 192, or 256 bits): ")
+    plain_text = input("Enter the plaintext: ")
+
+    start_time = time.time()
     ciphered_text = encrypt_plain_text(key, plain_text)
+    end_time = time.time()
+    encryption_time = (end_time - start_time) * 1000
+    
+    start_time = time.time()
     deciphered_text = decrypt_ciphered_text(key, ciphered_text)
+    end_time = time.time()
+    decryption_time = (end_time - start_time) * 1000
+    
+    print("Execution Time Details:")
+    print("Key Schedule Time: ", key_schedule_time, "ms")
+    print("Encryption Time: ", encryption_time, "ms")
+    print("Decryption Time: ", decryption_time, "ms")
