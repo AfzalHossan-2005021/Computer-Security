@@ -10,6 +10,10 @@ WORD_PER_KEY = 4
 BLOCK_SIZE = 16
 AES_modulus = BitVector(bitstring='100011011') # AES modulus
 
+# For CTR mode padding is not required
+PADDING=False
+
+# Sbox and InvSbox for AES
 Sbox = (
     0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
     0xCA, 0x82, 0xC9, 0x7D, 0xFA, 0x59, 0x47, 0xF0, 0xAD, 0xD4, 0xA2, 0xAF, 0x9C, 0xA4, 0x72, 0xC0,
@@ -99,6 +103,14 @@ def pad_text(plain_text: list):
     text = plain_text + padding
 
     return text
+
+# Function to remove padding from the plaintext
+def remove_padding(plain_text: list[BitVector]):
+    # Get the last byte of the plaintext
+    padding_length = plain_text[-1].intValue()
+    # Remove the padding
+    plain_text = plain_text[:-padding_length]
+    return plain_text
 
 # Take input key and plaintext
 def preprocess(key: str, plain_text: str, padding: bool = False) -> tuple[list[BitVector], list[BitVector]]:
@@ -247,6 +259,29 @@ def key_schedule(key: list[BitVector]):
 
     return round_keys
 
+# Function to convet 16 word text to 4x4 block
+def convert_text_to_block(text: list[BitVector]) -> list[list[BitVector]]:
+    block = []
+    # Convert the text to a 4x4 block
+    for i in range(WORD_PER_KEY):
+        row = []
+        for j in range(WORD_SIZE):
+            row.append(text[i * WORD_SIZE + j])
+        block.append(row)
+    # transpose the block
+    block = [list(x) for x in zip(*block)]
+    return block
+
+# Function to convert 4x4 blocks to plain text
+def convert_block_to_text(block: list[list[BitVector]]) -> list[BitVector]:
+    # transpose the block
+    block = [list(x) for x in zip(*block)]
+    text = []
+    for i in range(WORD_PER_KEY):
+        for j in range(WORD_SIZE):
+            text.append(block[i][j])
+    return text
+
 # Function to print a block
 def print_block(block: list[list[BitVector]]):
     for row in block:
@@ -291,87 +326,130 @@ def add_round_key(plain_tex_blockt: list[list[BitVector]], round_key: list[list[
     # print_block(plain_tex_blockt)
     return plain_tex_blockt
 
-# Function to encrypt a 128-block of plaintext
-def encrypt_block(block: list[list[BitVector]], round_keys: list[list[list[BitVector]]]):
+# Function to encrypt a 128 bit block
+def encrypt_block(block_1d: list[BitVector], round_keys: list[list[list[BitVector]]]) -> list[BitVector]:
+    # Convert the block to a 4x4 matrix
+    block_2d = convert_text_to_block(block_1d)
+
     # Add round key initially
-    block = add_round_key(block, round_keys[0])
+    block_2d = add_round_key(block_2d, round_keys[0])
 
     round_count = len(round_keys)
     # Perform 9 rounds of encryption
     for i in range(1, round_count - 1):
-        block = sub_bytes(block)
-        block = shift_rows(block)
-        block = mix_columns(block)
-        block = add_round_key(block, round_keys[i])
+        block_2d = sub_bytes(block_2d)
+        block_2d = shift_rows(block_2d)
+        block_2d = mix_columns(block_2d)
+        block_2d = add_round_key(block_2d, round_keys[i])
 
     # Perform the last round without MixColumns
-    block = sub_bytes(block)
-    block = shift_rows(block)
-    block = add_round_key(block, round_keys[round_count - 1])
+    block_2d = sub_bytes(block_2d)
+    block_2d = shift_rows(block_2d)
+    block_2d = add_round_key(block_2d, round_keys[round_count - 1])
 
-    return block
+    # Convert the block back to 1D
+    block_1d = convert_block_to_text(block_2d)
 
-# Function to convet text to 4x4 blocks
-def convert_text_to_blocks(text: list[BitVector]):
-    # Divide the plaintext into 4x4 blocks
-    text_blocks = []
-    for i in range(0, len(text), BLOCK_SIZE):
-        block = []
-        for j in range(WORD_PER_KEY):
-            word = []
-            for k in range(WORD_SIZE):
-                word.append(text[i + WORD_SIZE * j + k])
-            block.append(word)
-        # transpose the block
-        block = [list(x) for x in zip(*block)]
-        text_blocks.append(block)
+    return block_1d
 
-    return text_blocks
+# Function to combine nonce and counter into a block
+def create_counter_block(nonce: list[BitVector], counter: int) -> list[BitVector]:
+    # Determine sizes (typically half/half)
+    nonce_size = BLOCK_SIZE // 2  # 8 bytes for nonce
+    counter_size = BLOCK_SIZE - nonce_size  # 8 bytes for counter
+    
+    # Create BitVectors for each part
+    nonce_part = nonce[:nonce_size]  # Take first half of nonce
+    
+    # Convert counter to string and then BitVector
+    counter_str = f"{counter:0{counter_size}d}"
+    counter_part = [BitVector(textstring=counter_str[i]) for i in range(counter_size)]
 
-# Function to convert 4x4 blocks to plain text
-def convert_blocks_to_text(blocks: list[list[list[BitVector]]]):
-    # Convert the blocks to text
-    text = []
-    for block in blocks:
-        # transpose the block
-        block = [list(x) for x in zip(*block)]
-        for i in range(WORD_PER_KEY):
-            for j in range(WORD_SIZE):
-                text.append(block[i][j])
+    # Combine nonce and counter
+    counter_block = nonce_part + counter_part
+    return counter_block
 
-    return text
-
-
-# Function to encrypt the plaintext using the round keys
-def encrypt_plain_text(key: str, plain_text: str) -> list[BitVector]:
-    # preprocess the key and plaintext to bit vectors and pad the plaintext
-    key_bitvector , plain_text_bitvector = preprocess(key, plain_text, padding=True)
-
-    # Randomly generate a nonce
-    # nonce = [BitVector(intVal=random.randint(0, 255), size=8) for _ in range(BLOCK_SIZE)]
-
+# Utility function for encrypting and decrypting
+def encrypt_decrypt(key_bitvector: list[BitVector], text_bitvector: list[BitVector], nonce: list[BitVector]):
     # Determine the round keys
     round_keys = key_schedule(key_bitvector)
 
-    # Divide the plaintext into 4x4 blocks
-    plain_text_blocks = convert_text_to_blocks(plain_text_bitvector)
+    # Divide the plaintext into 16 byte blocks
+    plain_text_blocks = []
+    for i in range(0, len(text_bitvector), BLOCK_SIZE):
+        block = text_bitvector[i:((i + BLOCK_SIZE) if i + BLOCK_SIZE < len(text_bitvector) else len(text_bitvector))]
+
+        # Append the block to the list
+        plain_text_blocks.append(block)
 
     # store the encrypted blocks
     encrypted_blocks = []
 
-    # Encrypt each block
-    for block in plain_text_blocks:
-        encrypted_block = encrypt_block(block, round_keys)
+    # Encrypt each block using CTR mode
+    for i, block in enumerate(plain_text_blocks):
+        # Create a counter block
+        nonce_counter_block = create_counter_block(nonce, i)
+        # Encrypt the counter block
+        encrypted_counter_block = encrypt_block(nonce_counter_block, round_keys)
+        # XOR the plaintext block with the encrypted counter block
+        encrypted_block = XOR(block, encrypted_counter_block)
+        # Append the encrypted block to the list
         encrypted_blocks.append(encrypted_block)
 
-    cypher_text = convert_blocks_to_text(encrypted_blocks)
+    # convert the encrypted blocks to a single list
+    cipher_text_bitvector = [bit for block in encrypted_blocks for bit in block]
 
-    return cypher_text
+    return cipher_text_bitvector
+
+# Function to encrypt the plaintext using the round keys
+def encrypt_plain_text(key: str, plain_text: str) -> list[BitVector]:
+    # preprocess the key and plaintext to bit vectors and pad the plaintext
+    key_bitvector , plain_text_bitvector = preprocess(key, plain_text, padding=PADDING)
+
+    # Randomly generate a nonce
+    nonce = [BitVector(intVal=random.randint(0, 255), size=8) for _ in range(BLOCK_SIZE)]
+
+    cipher_text_bitvector = nonce + encrypt_decrypt(key_bitvector, plain_text_bitvector, nonce)
+    
+    print("Ciphered Text:\nIn HEX:", end=" ")
+    print_bitvector_as_hex(cipher_text_bitvector)
+    print("In ASCII:", end=" ")
+    print_bitvector_as_ascii(cipher_text_bitvector)
+    print()
+
+    return cipher_text_bitvector
+
+# Function to decrypt the ciphertext using the round keys
+def decrypt_ciphered_text(key: str, cipher_text: list[BitVector]):
+    # preprocess the key and ciphertext to bit vectors
+    key_bitvector = convet_string_to_bitvector(key)
+
+    # Extract the nonce and ciphertext from the ciphertext
+    nonce = cipher_text[:BLOCK_SIZE]
+    cipher_text_bitvector = cipher_text[BLOCK_SIZE:]
+
+    # Decrypt the ciphertext using the round keys
+    plain_text_bitvector = encrypt_decrypt(key_bitvector, cipher_text_bitvector, nonce)
+
+    print("Deciphered Text:")
+    if(PADDING):
+        print("In HEX (Before Unpadding):", end=" ")
+        print_bitvector_as_hex(plain_text_bitvector)
+        print("In ASCII (Before Unpadding):", end=" ")
+        print_bitvector_as_ascii(plain_text_bitvector)
+        # Remove padding from the plaintext
+        plain_text_bitvector = remove_padding(plain_text_bitvector)
+
+    print("In HEX:", end=" ")
+    print_bitvector_as_hex(plain_text_bitvector)
+    print("In ASCII:", end=" ")
+    print_bitvector_as_ascii(plain_text_bitvector)
+    print()
+
+    return plain_text_bitvector
         
 if __name__ == "__main__":
     key = "BUET CSE20 Batch"
-    plain_text = "We need picnic"
-    cipher_text = encrypt_plain_text(key, plain_text)
-
-    print("Cipher Text:", end=" ")
-    print_bitvector_as_hex(cipher_text)
+    plain_text = "We need picnic on 20th October as a part of our CSE20 batch activities. After that we will go to Cox's Bazar. We will have a lot of fun there. We will go to the beach and enjoy the sea. We will also visit some historical places. We will have a lot of fun."
+    ciphered_text = encrypt_plain_text(key, plain_text)
+    deciphered_text = decrypt_ciphered_text(key, ciphered_text)
