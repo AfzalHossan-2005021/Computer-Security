@@ -1,4 +1,5 @@
 import sys
+import time
 import random
 from BitVector import *
 sys.path.append("./BitVector-3.5.0/BitVector")
@@ -110,15 +111,57 @@ def double_and_add(d: int, point: tuple, a: int, p: int) -> tuple:
 
     return result
 
+# Function to generate public and private keys
+def generate_keys(point: tuple, a: int, p: int) -> tuple:
+    # Generate a random private key
+    private_key = random.randint(1, p-1)
+    # Calculate the public key using scalar multiplication
+    public_key = None
+    while public_key is None:
+        private_key = random.randint(1, p-1)
+        public_key = double_and_add(private_key, point, a, p)
+
+    return (private_key, public_key)
+
 def main():
     # Set seed and generate a random prime number
     random.seed(2005021)
-    # p = generate_prime(128)
-    # a, b = generate_curve_params(p, 128)
-    # x, y = find_generator_point(a, b, p)
-    # print(x, y)
-    for i in range(1, 50):
-        print(double_and_add(i, (5, 1), 2, 17))
+    time_stamp = [[0.0, 0.0, 0.0], [0.0, 0.0, 0.0], [0.0, 0.0, 0.0]]
+    trials = 10
+    len_p = [128, 192, 256]
+    for j in range(trials):
+        for i, width in enumerate(len_p):
+            p = generate_prime(width)
+            a, b = generate_curve_params(p, width)
+            x, y = find_generator_point(a, b, p)
 
+            start_time = time.time()
+            ka, A = generate_keys((x, y), a, p)
+            end_time = time.time()
+            time_stamp[i][0] += end_time - start_time
+
+            start_time = time.time()
+            kb, B = generate_keys((x, y), a, p)
+            end_time = time.time()
+            time_stamp[i][1] += end_time - start_time
+
+            start_time = time.time()
+            R = double_and_add(ka, B, a, p)
+            end_time = time.time()
+            time_stamp[i][2] += end_time - start_time
+
+    for i in range(3):
+        for j in range(3):
+            time_stamp[i][j] *= 1000 / trials
+
+    print("+-----------------+-----------------------------------------------+")
+    print("|                 |           Time-related performance            |")
+    print("| Key Size (bits) |---------------+---------------+---------------+")
+    print("|                 |       A       |       B       |       R       |")
+    print("+-----------------+---------------+---------------+---------------+")
+    for i in range(len(len_p)):
+        print(f"|\t{len_p[i]}\t  |\t{time_stamp[i][0]:.3f}\t  |\t{time_stamp[i][1]:.3f}\t  |\t{time_stamp[i][2]:.3f}\t  |")
+        print("+-----------------+---------------+---------------+---------------+")
+    
 if __name__ == "__main__":
     main()
