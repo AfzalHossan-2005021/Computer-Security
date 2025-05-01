@@ -6,6 +6,8 @@ LEFT = 0
 RIGHT = 1
 WORD_SIZE = 4
 WORD_PER_KEY = 4
+BLOCK_SIZE = 16
+AES_modulus = BitVector(bitstring='100011011') # AES modulus
 
 Sbox = (
     0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
@@ -45,6 +47,20 @@ InvSbox = (
     0x17, 0x2B, 0x04, 0x7E, 0xBA, 0x77, 0xD6, 0x26, 0xE1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0C, 0x7D,
 )
 
+Mixer = [
+    [BitVector(hexstring="02"), BitVector(hexstring="03"), BitVector(hexstring="01"), BitVector(hexstring="01")],
+    [BitVector(hexstring="01"), BitVector(hexstring="02"), BitVector(hexstring="03"), BitVector(hexstring="01")],
+    [BitVector(hexstring="01"), BitVector(hexstring="01"), BitVector(hexstring="02"), BitVector(hexstring="03")],
+    [BitVector(hexstring="03"), BitVector(hexstring="01"), BitVector(hexstring="01"), BitVector(hexstring="02")]
+]
+
+InvMixer = [
+    [BitVector(hexstring="0E"), BitVector(hexstring="0B"), BitVector(hexstring="0D"), BitVector(hexstring="09")],
+    [BitVector(hexstring="09"), BitVector(hexstring="0E"), BitVector(hexstring="0B"), BitVector(hexstring="0D")],
+    [BitVector(hexstring="0D"), BitVector(hexstring="09"), BitVector(hexstring="0E"), BitVector(hexstring="0B")],
+    [BitVector(hexstring="0B"), BitVector(hexstring="0D"), BitVector(hexstring="09"), BitVector(hexstring="0E")]
+]
+
 # Function to convert a string to a bit vector
 def convet_to_bitvector(key: str):
     # Convert key to bytes
@@ -83,6 +99,7 @@ def pad_text(plain_text: list):
 def input_and_preprocess(padding: bool = False):
     # key = input("Key:\nIn ASCII: ")
     key = "Thats my Kung Fu"
+    print("Key:\nIn ASCII: ", key)
     # Check if the key length is valid
     if len(key) * 8 != 128 and len(key) != 192 and len(key) != 256:
         raise ValueError("Key length must be 128, 192, or 256 bits.")
@@ -93,6 +110,7 @@ def input_and_preprocess(padding: bool = False):
     print()
     # plain_text = input("Plain Text:\nIn ASCII: ")
     plain_text = "Two One Nine Two"
+    print("Plain Text:\nIn ASCII: ", plain_text)
     plain_text = convet_to_bitvector(plain_text)
     print("In HEX:", end=" ")
     print_bitvector_as_hex(plain_text)
@@ -211,9 +229,120 @@ def key_schedule(key: list[BitVector], round_key_count: int, round_constants: li
 
     return round_keys
 
+# Function to print a block
+def print_block(block: list[list[BitVector]]):
+    for row in block:
+        for b in row:
+            print(b.get_bitvector_in_hex(), end=" ")
+        print()
+    print()
 
+# Function to perform the SubBytes step
+def sub_bytes(plain_tex_blockt: list[list[BitVector]]):
+    # Substitute each byte in the block using Sbox
+    for i in range(WORD_PER_KEY):
+        for j in range(WORD_SIZE):
+            plain_tex_blockt[i][j] = BitVector(intVal=Sbox[plain_tex_blockt[i][j].intValue()], size=8)
+    return plain_tex_blockt
+
+# Function to perform the ShiftRows step
+def shift_rows(plain_tex_blockt: list[list[BitVector]]):
+    # Shift rows of the block
+    for i in range(1, WORD_PER_KEY):
+        plain_tex_blockt[i] = rotate_word(plain_tex_blockt[i], i, LEFT)
+    return plain_tex_blockt
+
+# Function to perform the MixColumns step
+def mix_columns(plain_tex_blockt: list[list[BitVector]]):
+    result = []
+    # Mix columns of the block
+    for i in range(WORD_PER_KEY):
+        temp = [BitVector(size=8) for _ in range(WORD_PER_KEY)]
+        for j in range(WORD_SIZE):
+            for k in range(WORD_SIZE):
+                temp[j] ^= Mixer[i][k].gf_multiply_modular(plain_tex_blockt[k][j], AES_modulus, 8)
+        result.append(temp)
+    return result
+
+# Function to add round keys to the plaintext
+def add_round_key(plain_tex_blockt: list[list[BitVector]], round_key: list[list[BitVector]]):
+    # XOR the plaintext with the round key
+    for i in range(WORD_PER_KEY):
+        for j in range(WORD_SIZE):
+            plain_tex_blockt[i][j] = plain_tex_blockt[i][j] ^ round_key[i][j]
+    # print_block(plain_tex_blockt)
+    return plain_tex_blockt
+
+# Function to encrypt a 128-block of plaintext
+def encrypt_block(block: list[list[BitVector]], round_keys: list[list[list[BitVector]]]):
+    # Add round key initially
+    block = add_round_key(block, round_keys[0])
+
+    round_count = len(round_keys)
+    # Perform 9 rounds of encryption
+    for i in range(1, round_count - 1):
+        block = sub_bytes(block)
+        block = shift_rows(block)
+        block = mix_columns(block)
+        block = add_round_key(block, round_keys[i])
+
+    # Perform the last round without MixColumns
+    block = sub_bytes(block)
+    block = shift_rows(block)
+    block = add_round_key(block, round_keys[round_count - 1])
+
+    return block
+
+# Function to convet text to 4x4 blocks
+def convert_text_to_blocks(text: list[BitVector]):
+    # Divide the plaintext into 4x4 blocks
+    text_blocks = []
+    for i in range(0, len(text), BLOCK_SIZE):
+        block = []
+        for j in range(WORD_PER_KEY):
+            word = []
+            for k in range(WORD_SIZE):
+                word.append(text[i + WORD_SIZE * j + k])
+            block.append(word)
+        # transpose the block
+        block = [list(x) for x in zip(*block)]
+        text_blocks.append(block)
+
+    return text_blocks
+
+# Function to convert 4x4 blocks to plain text
+def convert_blocks_to_text(blocks: list[list[list[BitVector]]]):
+    # Convert the blocks to text
+    text = []
+    for block in blocks:
+        # transpose the block
+        block = [list(x) for x in zip(*block)]
+        for i in range(WORD_PER_KEY):
+            for j in range(WORD_SIZE):
+                text.append(block[i][j])
+
+    return text
+
+
+# Function to encrypt the plaintext using the round keys
+def encrypt_plain_text(plain_text: list[BitVector], round_keys: list[list[list[BitVector]]]):
+    # Divide the plaintext into 4x4 blocks
+    plain_text_blocks = convert_text_to_blocks(plain_text)
+
+    # store the encrypted blocks
+    encrypted_blocks = []
+
+    # Encrypt each block
+    for block in plain_text_blocks:
+        encrypted_block = encrypt_block(block, round_keys)
+        encrypted_blocks.append(encrypted_block)
+
+    cypher_text = convert_blocks_to_text(encrypted_blocks)
+
+    return cypher_text
+        
 if __name__ == "__main__":
-    key, plain_text = input_and_preprocess(padding=True)
+    key, plain_text = input_and_preprocess()
     key_length = len(key) * 8
     round_count = get_round_counts(key_length)
     round_key_count = round_count + 1
@@ -221,26 +350,10 @@ if __name__ == "__main__":
     round_constants = generate_round_constants(round_constants_count)
 
     round_keys = key_schedule(key, round_key_count, round_constants)
-    print("Round Keys:")
-    for i in range(len(round_keys)):
-        print("Round ", i, ":", end=" ")
-        # transpose the round key to show in the correct sequence
-        round_keys[i] = [list(x) for x in zip(*round_keys[i])]
-        for j in range(len(round_keys[i])):
-            for k in range(len(round_keys[i][j])):
-                print(round_keys[i][j][k].get_bitvector_in_hex(), end=" ")
-        print()
-    print()
 
+    cipher_text = encrypt_plain_text(plain_text, round_keys)
 
-# Round 0: 54 68 61 74 73 20 6D 79 20 4B 75 6E 67 20 46 75
-# Round 1: E2 32 FC F1 91 12 91 88 B1 59 E4 E6 D6 79 A2 93
-# Round 2: 56 08 20 07 C7 1A B1 8F 76 43 55 69 A0 3A F7 FA
-# Round 3: D2 60 0D E7 15 7A BC 68 63 39 E9 01 C3 03 1E FB
-# Round 4: A1 12 02 C9 B4 68 BE A1 D7 51 57 A0 14 52 49 5B
-# Round 5: B1 29 3B 33 05 41 85 92 D2 10 D2 32 C6 42 9B 69
-# Round 6: BD 3D C2 87 B8 7C 47 15 6A 6C 95 27 AC 2E 0E 4E
-# Round 7: CC 96 ED 16 74 EA AA 03 1E 86 3F 24 B2 A8 31 6A
-# Round 8: 8E 51 EF 21 FA BB 45 22 E4 3D 7A 06 56 95 4B 6C
-# Round 9: BF E2 BF 90 45 59 FA B2 A1 64 80 B4 F7 F1 CB D8
-# Round 10: 28 FD DE F8 6D A4 24 4A CC C0 A4 FE 3B 31 6F 26
+    print("Cipher Text:", end=" ")
+    print_bitvector_as_hex(cipher_text)
+
+# Cipher Text: 29 c3 50 5f 57 14 20 f6 40 22 99 b3 1a 02 d7 3a 
