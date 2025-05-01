@@ -1,6 +1,6 @@
+from BitVector import *
 import sys
 sys.path.append("./BitVector-3.5.0/BitVector")
-from BitVector import *
 
 LEFT = 0
 RIGHT = 1
@@ -68,6 +68,9 @@ def pad_text(plain_text: list):
     # Pad the text to be a multiple of 16 bytes
     block_size = 16
     padding_length = block_size - (len(plain_text) % block_size)
+    # If the length is already a multiple of 16, padding_length is 16
+    if padding_length == 0:
+        padding_length = block_size
     # Pad with the length of the padding
     padding = [BitVector(intVal=padding_length, size=8)] * padding_length
     # Append the padding to the plaintext
@@ -76,8 +79,12 @@ def pad_text(plain_text: list):
     return text
 
 # Take input key and plaintext
-def input_and_preprocess():
+def input_and_preprocess(padding: bool = False):
     key = input("Key:\nIn ASCII: ")
+    # Check if the key length is valid
+    if len(key) * 8 != 128 and len(key) != 192 and len(key) != 256:
+        raise ValueError("Key length must be 128, 192, or 256 bits.")
+    # Convert key to bytes
     key = convet_to_bitvector(key)
     print("In HEX:", end=" ")
     print_bitvector_as_hex(key)
@@ -86,13 +93,14 @@ def input_and_preprocess():
     plain_text = convet_to_bitvector(plain_text)
     print("In HEX:", end=" ")
     print_bitvector_as_hex(plain_text)
-    plain_text = pad_text(plain_text)
-    print("In ASCII(after padding):", end=" ")
-    print_bitvector_as_ascii(plain_text)
-    print("In HEX(after padding):", end=" ")
-    print_bitvector_as_hex(plain_text)
-    print()
     # Pad the plaintext
+    if padding:
+        plain_text = pad_text(plain_text)
+        print("In ASCII(after padding):", end=" ")
+        print_bitvector_as_ascii(plain_text)
+        print("In HEX(after padding):", end=" ")
+        print_bitvector_as_hex(plain_text)
+        print()
     return key, plain_text
 
 # Function to get the number of rounds for AES based on key length
@@ -111,17 +119,22 @@ def get_round_counts(key_length: int):
 # This function generates the round constants for AES key schedule.
 def generate_round_constants(count: int):
     # Generate round constants
-    constants = [0x01]
+    constants = [BitVector(intVal=1, size=8)]
     for i in range(1, count):
-        if constants[i-1] < 0x80:
-            constants.append(constants[i-1] << 1)
-        else:
-            constants.append(((constants[i-1] << 1) ^ 0x11B) % 0x100)
+        constants.append(constants[i-1].deep_copy())
+        # Left shift the value by 1
+        constants[i].shift_left_by_one()
+        # If the value is greater than or equal to 128, XOR with 0x11B
+        if constants[i-1] >= BitVector(intVal=128, size=8):
+            constants[i] = constants[i] ^ BitVector(intVal=0x1B, size=8)
 
-    # Convert to round constants
-    round_constants = [[0, 0, 0, 0]] # Initialize with 0 at index 0
+    # Convert constants to round constants
+    # Initialize with 0 at index 0 to match the AES standard
+    round_constants = [[BitVector(size=8), BitVector(size=8),
+                        BitVector(size=8), BitVector(size=8)]]
     for i in range(count):
-        round_constants.append([constants[i], 0, 0, 0])
+        round_constants.append([constants[i], BitVector(size=8),
+                        BitVector(size=8), BitVector(size=8)])
 
     return round_constants
 
@@ -155,9 +168,9 @@ def key_schedule(key: str, round_key_count: int, round_constants: list):
     original_key_words = []
     for i in range(original_key_word_count):
         word = []
-        for j in range (4):
+        for j in range(4):
             word.append(key[4 * i + j])
-        original_key_words.append(word)      
+        original_key_words.append(word)
 
     # Generate round keys
     extended_key_words = []
@@ -189,20 +202,27 @@ def key_schedule(key: str, round_key_count: int, round_constants: list):
     for i in range(round_key_count):
         round_key = []
         for j in range(4):
-            round_key.append(extended_key_words[i * 4 + j]) 
+            round_key.append(extended_key_words[i * 4 + j])
         # transpose the round key
-        round_key = [list(x) for x in zip(*round_key)]         
+        round_key = [list(x) for x in zip(*round_key)]
         round_keys.append(round_key)
 
     return round_keys
-    
+
+
 if __name__ == "__main__":
-    key, plain_text = input_and_preprocess()
-    # key_length = len(key) * 8
-    # round_count = get_round_counts(key_length)
-    # round_key_count = round_count + 1
-    # round_constants_count = (round_count * 4) // (key_length // 32)
-    # round_constants = generate_round_constants(round_constants_count)
+    key, plain_text = input_and_preprocess(padding=True)
+    key_length = len(key) * 8
+    round_count = get_round_counts(key_length)
+    round_key_count = round_count + 1
+    round_constants_count = (round_count * 4) // (key_length // 32)
+    round_constants = generate_round_constants(round_constants_count)
+    print("Round Constants:")
+    for i in range(1, len(round_constants)):
+        for j in range(len(round_constants[i])):
+            print(round_constants[i][j].get_bitvector_in_hex(), end=" ")
+        print()
+    print()
 
     # round_keys = key_schedule(key, round_key_count, round_constants)
     # print(round_keys)
