@@ -1,6 +1,7 @@
 from BitVector import *
 import sys
 sys.path.append("./BitVector-3.5.0/BitVector")
+import random
 
 LEFT = 0
 RIGHT = 1
@@ -61,10 +62,14 @@ InvMixer = [
     [BitVector(hexstring="0B"), BitVector(hexstring="0D"), BitVector(hexstring="09"), BitVector(hexstring="0E")]
 ]
 
+def check_key_validity(key: str):
+    # Check if the key length is valid
+    if len(key) * 8 != 128 and len(key) != 192 and len(key) != 256:
+        raise ValueError("Key length must be 128, 192, or 256 bits.")
+
 # Function to convert a string to a bit vector
-def convet_to_bitvector(key: str):
-    # Convert key to bytes
-    return [BitVector(textstring=char) for char in key]
+def convet_string_to_bitvector(string: str):
+    return [BitVector(textstring=char) for char in string]
 
 # Function to convert a bit vector to a string
 def print_bitvector_as_ascii(key: list):
@@ -96,33 +101,35 @@ def pad_text(plain_text: list):
     return text
 
 # Take input key and plaintext
-def input_and_preprocess(padding: bool = False):
-    # key = input("Key:\nIn ASCII: ")
-    key = "Thats my Kung Fu"
-    print("Key:\nIn ASCII: ", key)
+def preprocess(key: str, plain_text: str, padding: bool = False) -> tuple[list[BitVector], list[BitVector]]:
     # Check if the key length is valid
-    if len(key) * 8 != 128 and len(key) != 192 and len(key) != 256:
-        raise ValueError("Key length must be 128, 192, or 256 bits.")
-    # Convert key to bytes
-    key = convet_to_bitvector(key)
+    check_key_validity(key)
+
+    # Converts the key and plaintext to bit vectors
+    key_bitvecotr = convet_string_to_bitvector(key)
+    plain_text_bitvector = convet_string_to_bitvector(plain_text)
+
+    # Print the key and plaintext in ASCII and HEX
+    print("Key:\nIn ASCII:", end=" ")
+    print_bitvector_as_ascii(key_bitvecotr)
     print("In HEX:", end=" ")
-    print_bitvector_as_hex(key)
+    print_bitvector_as_hex(key_bitvecotr)
     print()
-    # plain_text = input("Plain Text:\nIn ASCII: ")
-    plain_text = "Two One Nine Two"
-    print("Plain Text:\nIn ASCII: ", plain_text)
-    plain_text = convet_to_bitvector(plain_text)
+    print("Plain Text:\nIn ASCII:", end=" ")
+    print_bitvector_as_ascii(plain_text_bitvector)
     print("In HEX:", end=" ")
-    print_bitvector_as_hex(plain_text)
+    print_bitvector_as_hex(plain_text_bitvector)
+
     # Pad the plaintext
     if padding:
-        plain_text = pad_text(plain_text)
-        print("In ASCII(after padding):", end=" ")
-        print_bitvector_as_ascii(plain_text)
-        print("In HEX(after padding):", end=" ")
-        print_bitvector_as_hex(plain_text)
-        print()
-    return key, plain_text
+        plain_text_bitvector = pad_text(plain_text_bitvector)
+        print("In ASCII (After Padding):", end=" ")
+        print_bitvector_as_ascii(plain_text_bitvector)
+        print("In HEX (After Padding):", end=" ")
+        print_bitvector_as_hex(plain_text_bitvector)
+        
+    print()
+    return key_bitvecotr, plain_text_bitvector
 
 # Function to get the number of rounds for AES based on key length
 def get_round_counts(key_length: int):
@@ -181,7 +188,15 @@ def XOR(a: list[BitVector], b: list[BitVector]):
     return [a[i] ^ b[i] for i in range(len(a))]
 
 # Key schedule function
-def key_schedule(key: list[BitVector], round_key_count: int, round_constants: list[list[BitVector]]):
+def key_schedule(key: list[BitVector]):
+    # determine the number of rounds based on key length
+    key_length = len(key) * 8
+    round_count = get_round_counts(key_length)
+
+    # determine the number of round constants and generate them
+    round_constants_count = (round_count * 4) // (key_length // 32)
+    round_constants = generate_round_constants(round_constants_count)
+
     original_key_word_count = len(key) // WORD_SIZE
 
     # Convert key to 4-byte words
@@ -192,7 +207,10 @@ def key_schedule(key: list[BitVector], round_key_count: int, round_constants: li
             word.append(key[WORD_SIZE * i + j])
         original_key_words.append(word)
 
-    # Generate round keys
+    # Determine round key count and generate them
+    round_key_count = round_count + 1
+
+    # Initialize the extended key words
     extended_key_words = []
 
     # Extend the keys
@@ -325,9 +343,18 @@ def convert_blocks_to_text(blocks: list[list[list[BitVector]]]):
 
 
 # Function to encrypt the plaintext using the round keys
-def encrypt_plain_text(plain_text: list[BitVector], round_keys: list[list[list[BitVector]]]):
+def encrypt_plain_text(key: str, plain_text: str) -> list[BitVector]:
+    # preprocess the key and plaintext to bit vectors and pad the plaintext
+    key_bitvector , plain_text_bitvector = preprocess(key, plain_text, padding=True)
+
+    # Randomly generate a nonce
+    # nonce = [BitVector(intVal=random.randint(0, 255), size=8) for _ in range(BLOCK_SIZE)]
+
+    # Determine the round keys
+    round_keys = key_schedule(key_bitvector)
+
     # Divide the plaintext into 4x4 blocks
-    plain_text_blocks = convert_text_to_blocks(plain_text)
+    plain_text_blocks = convert_text_to_blocks(plain_text_bitvector)
 
     # store the encrypted blocks
     encrypted_blocks = []
@@ -342,18 +369,9 @@ def encrypt_plain_text(plain_text: list[BitVector], round_keys: list[list[list[B
     return cypher_text
         
 if __name__ == "__main__":
-    key, plain_text = input_and_preprocess()
-    key_length = len(key) * 8
-    round_count = get_round_counts(key_length)
-    round_key_count = round_count + 1
-    round_constants_count = (round_count * 4) // (key_length // 32)
-    round_constants = generate_round_constants(round_constants_count)
-
-    round_keys = key_schedule(key, round_key_count, round_constants)
-
-    cipher_text = encrypt_plain_text(plain_text, round_keys)
+    key = "BUET CSE20 Batch"
+    plain_text = "We need picnic"
+    cipher_text = encrypt_plain_text(key, plain_text)
 
     print("Cipher Text:", end=" ")
     print_bitvector_as_hex(cipher_text)
-
-# Cipher Text: 29 c3 50 5f 57 14 20 f6 40 22 99 b3 1a 02 d7 3a 
