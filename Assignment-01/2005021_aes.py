@@ -5,6 +5,7 @@ sys.path.append("./BitVector-3.5.0/BitVector")
 LEFT = 0
 RIGHT = 1
 WORD_SIZE = 4
+WORD_PER_KEY = 4
 
 Sbox = (
     0x63, 0x7C, 0x77, 0x7B, 0xF2, 0x6B, 0x6F, 0xC5, 0x30, 0x01, 0x67, 0x2B, 0xFE, 0xD7, 0xAB, 0x76,
@@ -80,7 +81,8 @@ def pad_text(plain_text: list):
 
 # Take input key and plaintext
 def input_and_preprocess(padding: bool = False):
-    key = input("Key:\nIn ASCII: ")
+    # key = input("Key:\nIn ASCII: ")
+    key = "Thats my Kung Fu"
     # Check if the key length is valid
     if len(key) * 8 != 128 and len(key) != 192 and len(key) != 256:
         raise ValueError("Key length must be 128, 192, or 256 bits.")
@@ -89,7 +91,8 @@ def input_and_preprocess(padding: bool = False):
     print("In HEX:", end=" ")
     print_bitvector_as_hex(key)
     print()
-    plain_text = input("Plain Text:\nIn ASCII: ")
+    # plain_text = input("Plain Text:\nIn ASCII: ")
+    plain_text = "Two One Nine Two"
     plain_text = convet_to_bitvector(plain_text)
     print("In HEX:", end=" ")
     print_bitvector_as_hex(plain_text)
@@ -138,7 +141,7 @@ def generate_round_constants(count: int):
 
     return round_constants
 
-def rotate_word(word: list, n: int, direction: int):
+def rotate_word(word: list[BitVector], n: int, direction: int):
     # Rotate left a word by n byes
     if direction == LEFT:
         return word[n:] + word[:n]
@@ -147,36 +150,35 @@ def rotate_word(word: list, n: int, direction: int):
     else:
         raise ValueError("Invalid direction. Use LEFT or RIGHT.")
 
-def substitute_word(word: list):
+def substitute_word(word: list[BitVector]):
     # Substitute each byte in the word using Sbox
     result = []
     for b in word:
         # Convert to int if it's a character
-        index = ord(b) if isinstance(b, str) else b
-        result.append(Sbox[index])
+        result.append(BitVector(intVal=Sbox[b.intValue()], size=8))
     return result
 
-def XOR(a: list, b: list):
+def XOR(a: list[BitVector], b: list[BitVector]):
     # XOR two lists of bytes
     return [a[i] ^ b[i] for i in range(len(a))]
 
 # Key schedule function
-def key_schedule(key: str, round_key_count: int, round_constants: list):
+def key_schedule(key: list[BitVector], round_key_count: int, round_constants: list[list[BitVector]]):
     original_key_word_count = len(key) // WORD_SIZE
 
     # Convert key to 4-byte words
     original_key_words = []
     for i in range(original_key_word_count):
         word = []
-        for j in range(4):
-            word.append(key[4 * i + j])
+        for j in range(WORD_SIZE):
+            word.append(key[WORD_SIZE * i + j])
         original_key_words.append(word)
 
     # Generate round keys
     extended_key_words = []
 
     # Extend the keys
-    for i in range(4 * round_key_count):
+    for i in range(round_key_count * WORD_PER_KEY):
         if i < original_key_word_count:
             extended_key_words.append(original_key_words[i])
         else:
@@ -201,8 +203,8 @@ def key_schedule(key: str, round_key_count: int, round_constants: list):
     round_keys = []
     for i in range(round_key_count):
         round_key = []
-        for j in range(4):
-            round_key.append(extended_key_words[i * 4 + j])
+        for j in range(WORD_PER_KEY):
+            round_key.append(extended_key_words[i * WORD_PER_KEY + j])
         # transpose the round key
         round_key = [list(x) for x in zip(*round_key)]
         round_keys.append(round_key)
@@ -217,12 +219,28 @@ if __name__ == "__main__":
     round_key_count = round_count + 1
     round_constants_count = (round_count * 4) // (key_length // 32)
     round_constants = generate_round_constants(round_constants_count)
-    print("Round Constants:")
-    for i in range(1, len(round_constants)):
-        for j in range(len(round_constants[i])):
-            print(round_constants[i][j].get_bitvector_in_hex(), end=" ")
+
+    round_keys = key_schedule(key, round_key_count, round_constants)
+    print("Round Keys:")
+    for i in range(len(round_keys)):
+        print("Round ", i, ":", end=" ")
+        # transpose the round key to show in the correct sequence
+        round_keys[i] = [list(x) for x in zip(*round_keys[i])]
+        for j in range(len(round_keys[i])):
+            for k in range(len(round_keys[i][j])):
+                print(round_keys[i][j][k].get_bitvector_in_hex(), end=" ")
         print()
     print()
 
-    # round_keys = key_schedule(key, round_key_count, round_constants)
-    # print(round_keys)
+
+# Round 0: 54 68 61 74 73 20 6D 79 20 4B 75 6E 67 20 46 75
+# Round 1: E2 32 FC F1 91 12 91 88 B1 59 E4 E6 D6 79 A2 93
+# Round 2: 56 08 20 07 C7 1A B1 8F 76 43 55 69 A0 3A F7 FA
+# Round 3: D2 60 0D E7 15 7A BC 68 63 39 E9 01 C3 03 1E FB
+# Round 4: A1 12 02 C9 B4 68 BE A1 D7 51 57 A0 14 52 49 5B
+# Round 5: B1 29 3B 33 05 41 85 92 D2 10 D2 32 C6 42 9B 69
+# Round 6: BD 3D C2 87 B8 7C 47 15 6A 6C 95 27 AC 2E 0E 4E
+# Round 7: CC 96 ED 16 74 EA AA 03 1E 86 3F 24 B2 A8 31 6A
+# Round 8: 8E 51 EF 21 FA BB 45 22 E4 3D 7A 06 56 95 4B 6C
+# Round 9: BF E2 BF 90 45 59 FA B2 A1 64 80 B4 F7 F1 CB D8
+# Round 10: 28 FD DE F8 6D A4 24 4A CC C0 A4 FE 3B 31 6F 26
