@@ -1,10 +1,11 @@
-from BitVector import *
 import sys
-sys.path.append("./BitVector-3.5.0/BitVector")
+import time
 import random
 import multiprocessing
+from BitVector import *
 from concurrent.futures import ProcessPoolExecutor
-import time
+
+sys.path.append("./BitVector-3.5.0/BitVector")
 
 LEFT = 0
 RIGHT = 1
@@ -82,6 +83,13 @@ def convet_string_to_bitvector(string: str):
     return [BitVector(textstring=char) for char in string]
 
 # Function to convert a bit vector to a string
+def convet_bitvector_to_string(bitvector: list[BitVector]):
+    text = ""
+    for b in bitvector:
+        text += b.get_bitvector_in_ascii()
+    return text
+
+# Function to convert a bit vector to a string
 def print_bitvector_as_ascii(key: list):
     for bitvector in key:
         # Convert each byte to its ASCII representation
@@ -96,27 +104,38 @@ def print_bitvector_as_hex(key: list):
     print()
 
 # Padding function to ensure the key is a multiple of 16 bytes
-def pad_text(plain_text: list):
+def pad_text(text: list[BitVector]) -> list[BitVector]:
     # Pad the text to be a multiple of 16 bytes
     block_size = 16
-    padding_length = block_size - (len(plain_text) % block_size)
+    padding_length = block_size - (len(text) % block_size)
     # If the length is already a multiple of 16, padding_length is 16
     if padding_length == 0:
         padding_length = block_size
     # Pad with the length of the padding
     padding = [BitVector(intVal=padding_length, size=8)] * padding_length
     # Append the padding to the plaintext
-    text = plain_text + padding
+    padded_text = text + padding
 
-    return text
+    print("In ASCII (After Padding):", end=" ")
+    print_bitvector_as_ascii(padded_text)
+    print("In HEX (After Padding):", end=" ")
+    print_bitvector_as_hex(padded_text)
+
+    return padded_text
 
 # Function to remove padding from the plaintext
-def remove_padding(plain_text: list[BitVector]):
+def remove_padding(text: list[BitVector]) -> list[BitVector]:
+    print("In HEX (Before Unpadding):", end=" ")
+    print_bitvector_as_hex(text)
+    print("In ASCII (Before Unpadding):", end=" ")
+    print_bitvector_as_ascii(text)
+
     # Get the last byte of the plaintext
-    padding_length = plain_text[-1].intValue()
+    padding_length = text[-1].intValue()
     # Remove the padding
-    plain_text = plain_text[:-padding_length]
-    return plain_text
+    unpadded_text = text[:-padding_length]
+
+    return unpadded_text
 
 # Take input key and plaintext
 def preprocess(key: str, plain_text: str, padding: bool = False) -> tuple[list[BitVector], list[BitVector]]:
@@ -127,26 +146,10 @@ def preprocess(key: str, plain_text: str, padding: bool = False) -> tuple[list[B
     key_bitvecotr = convet_string_to_bitvector(key)
     plain_text_bitvector = convet_string_to_bitvector(plain_text)
 
-    # Print the key and plaintext in ASCII and HEX
-    print("Key:\nIn ASCII:", end=" ")
-    print_bitvector_as_ascii(key_bitvecotr)
-    print("In HEX:", end=" ")
-    print_bitvector_as_hex(key_bitvecotr)
-    print()
-    print("Plain Text:\nIn ASCII:", end=" ")
-    print_bitvector_as_ascii(plain_text_bitvector)
-    print("In HEX:", end=" ")
-    print_bitvector_as_hex(plain_text_bitvector)
-
     # Pad the plaintext
     if padding:
         plain_text_bitvector = pad_text(plain_text_bitvector)
-        print("In ASCII (After Padding):", end=" ")
-        print_bitvector_as_ascii(plain_text_bitvector)
-        print("In HEX (After Padding):", end=" ")
-        print_bitvector_as_hex(plain_text_bitvector)
         
-    print()
     return key_bitvecotr, plain_text_bitvector
 
 # Function to get the number of rounds for AES based on key length
@@ -425,7 +428,7 @@ def encrypt_decrypt(key_bitvector: list[BitVector], text_bitvector: list[BitVect
     return cipher_text_bitvector
 
 # Function to encrypt the plaintext using the round keys
-def encrypt_plain_text(key: str, plain_text: str) -> list[BitVector]:
+def encrypt_plain_text(key: str, plain_text: str) -> str:
     # preprocess the key and plaintext to bit vectors and pad the plaintext
     key_bitvector , plain_text_bitvector = preprocess(key, plain_text, padding=PADDING)
 
@@ -433,58 +436,79 @@ def encrypt_plain_text(key: str, plain_text: str) -> list[BitVector]:
     nonce = [BitVector(intVal=random.randint(0, 255), size=8) for _ in range(BLOCK_SIZE)]
 
     cipher_text_bitvector = nonce + encrypt_decrypt(key_bitvector, plain_text_bitvector, nonce)
-    
-    print("Ciphered Text:\nIn HEX:", end=" ")
-    print_bitvector_as_hex(cipher_text_bitvector)
-    print("In ASCII:", end=" ")
-    print_bitvector_as_ascii(cipher_text_bitvector)
-    print()
 
-    return cipher_text_bitvector
+    # Convert the list of BitVectors to string
+    cipher_text = convet_bitvector_to_string(cipher_text_bitvector)
+
+    return cipher_text
 
 # Function to decrypt the ciphertext using the round keys
-def decrypt_ciphered_text(key: str, cipher_text: list[BitVector]):
+def decrypt_ciphered_text(key: str, cipher_text: str) -> str:
     # preprocess the key and ciphertext to bit vectors
     key_bitvector = convet_string_to_bitvector(key)
+    nonce_cipher_text_bitvector = convet_string_to_bitvector(cipher_text)
 
     # Extract the nonce and ciphertext from the ciphertext
-    nonce = cipher_text[:BLOCK_SIZE]
-    cipher_text_bitvector = cipher_text[BLOCK_SIZE:]
+    nonce = nonce_cipher_text_bitvector[:BLOCK_SIZE]
+    cipher_text_bitvector = nonce_cipher_text_bitvector[BLOCK_SIZE:]
 
     # Decrypt the ciphertext using the round keys
-    plain_text_bitvector = encrypt_decrypt(key_bitvector, cipher_text_bitvector, nonce)
+    deciphered_text_bitvector = encrypt_decrypt(key_bitvector, cipher_text_bitvector, nonce)
 
-    print("Deciphered Text:")
     if(PADDING):
-        print("In HEX (Before Unpadding):", end=" ")
-        print_bitvector_as_hex(plain_text_bitvector)
-        print("In ASCII (Before Unpadding):", end=" ")
-        print_bitvector_as_ascii(plain_text_bitvector)
         # Remove padding from the plaintext
-        plain_text_bitvector = remove_padding(plain_text_bitvector)
+        deciphered_text_bitvector = remove_padding(deciphered_text_bitvector)
 
-    print("In HEX:", end=" ")
-    print_bitvector_as_hex(plain_text_bitvector)
-    print("In ASCII:", end=" ")
-    print_bitvector_as_ascii(plain_text_bitvector)
-    print()
+    deciphered_text = convet_bitvector_to_string(deciphered_text_bitvector)
 
-    return plain_text_bitvector
-        
+    return deciphered_text
+
 if __name__ == "__main__":
-    key = input("Enter the key (128, 192, or 256 bits): ")
+    key = input("Enter the key (16, 24, or 32 characters): ")
     plain_text = input("Enter the plaintext: ")
 
+    # Print the key and plaintext in ASCII and HEX
+    key_bitvecotr = convet_string_to_bitvector(key)
+    plain_text_bitvector = convet_string_to_bitvector(plain_text)
+    print("Key:\nIn ASCII:", end=" ")
+    print_bitvector_as_ascii(key_bitvecotr)
+    print("In HEX:", end=" ")
+    print_bitvector_as_hex(key_bitvecotr)
+    print()
+    print("Plain Text:\nIn ASCII:", end=" ")
+    print_bitvector_as_ascii(plain_text_bitvector)
+    print("In HEX:", end=" ")
+    print_bitvector_as_hex(plain_text_bitvector)
+    print()
+
+    # Encrypt the plaintext
     start_time = time.time()
     ciphered_text = encrypt_plain_text(key, plain_text)
     end_time = time.time()
     encryption_time = (end_time - start_time) * 1000
+
+    ciphered_text_bitvector = convet_string_to_bitvector(ciphered_text)
+    print("Ciphered Text:\nIn HEX:", end=" ")
+    print_bitvector_as_hex(ciphered_text_bitvector)
+    print("In ASCII:", end=" ")
+    print_bitvector_as_ascii(ciphered_text_bitvector)
+    print()
     
+    # Decrypt the ciphertext
+    print("Deciphered Text:")
     start_time = time.time()
     deciphered_text = decrypt_ciphered_text(key, ciphered_text)
     end_time = time.time()
     decryption_time = (end_time - start_time) * 1000
+
+    deciphered_text_bitvector = convet_string_to_bitvector(deciphered_text)
+    print("In HEX:", end=" ")
+    print_bitvector_as_hex(deciphered_text_bitvector)
+    print("In ASCII:", end=" ")
+    print_bitvector_as_ascii(deciphered_text_bitvector)
+    print()
     
+    # Print the execution time details
     print("Execution Time Details:")
     print("Key Schedule Time: ", key_schedule_time, "ms")
     print("Encryption Time: ", encryption_time, "ms")
