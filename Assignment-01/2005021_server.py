@@ -49,13 +49,6 @@ def main():
 
         print(f"Shared secret: R={R}")
 
-        # a = client_skt.recv(1024).decode()
-        # print(a)
-        # b = client_skt.recv(1024).decode()
-        # print(b)
-        # G = client_skt.recv(1024).decode()
-        # print(f"Received values from client: a={a}, b={b}, G={G}, p={p}")
-        # Close the connection with the client 
         client_skt.close()
 
         # Breaking once connection closed
