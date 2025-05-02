@@ -1,3 +1,4 @@
+import os
 import socket
 import hashlib
 import _2005021_ecc as ecc
@@ -14,7 +15,7 @@ key_length = 128
 # Function to derive AES key from the shared secret
 def derive_aes_key(R: tuple[int, int], key_length_bits: int) -> str:
     # Convert point to bytes
-    seed = str(R[0]).encode('utf-8')
+    seed = str(R[0]).encode('unicode_escape')
     
     # Determine key length in bytes
     key_bytes_length = key_length_bits // 8
@@ -47,13 +48,13 @@ def derive_aes_key(R: tuple[int, int], key_length_bits: int) -> str:
 # Function to send a string over a socket
 def send_string(skt: socket, string: str):
     # Encode the string to bytes
-    byte_string = string.encode()
+    byte_string = string.encode('unicode_escape')
     
     # Send the length of the string first
-    skt.send(str(len(byte_string)).encode())
+    skt.send((str(len(byte_string)).zfill(1024)).encode('unicode_escape'))
 
     # Wait for the server to be ready to receive the string
-    r = skt.recv(1024).decode()
+    r = skt.recv(1024).decode('unicode_escape')
     if(int(r) != len(byte_string)):
         print("Length mismatch")
         return
@@ -66,8 +67,8 @@ def send_string(skt: socket, string: str):
 # Function to receive a string over a socket
 def receive_string(skt: socket):
     # Receive the length of the string first
-    length = int(skt.recv(1024).decode())
-    skt.send(str(length).encode())
+    length = int(skt.recv(1024).decode('unicode_escape'))
+    skt.send(str(length).encode('unicode_escape'))
 
     # Initialize an empty byte array to store the received data
     byte_string = bytearray()
@@ -80,7 +81,7 @@ def receive_string(skt: socket):
         byte_string.extend(chunk)
 
     # Decode the byte array to a string
-    return byte_string.decode()
+    return byte_string.decode('unicode_escape')
 
 # Function to receive domain parameters
 def receive_domain_parameters(skt: socket):
@@ -110,6 +111,79 @@ def exchange_public_keys(skt: socket, B: tuple[int, int]) -> tuple[int, int]:
 
     return A
 
+# Function to send a string over a socket with AES encryption
+def secure_send_string(skt: socket, plain_text: str, key: str) -> None:
+    # Encode the string to bytes
+    ciphered_text = aes.encrypt_plain_text(key, plain_text)
+    byte_string = ciphered_text.encode('unicode_escape')
+    
+    # Send the length of the string first
+    skt.send((str(len(byte_string)).zfill(1024)).encode('unicode_escape'))
+
+    # Wait for the server to be ready to receive the string
+    r = skt.recv(1024).decode('unicode_escape')
+    if(int(r) != len(byte_string)):
+        print("Length mismatch")
+        return
+    
+    # Send the actual string as 4kb chunks
+    for i in range(0, len(byte_string), CHUNK_SIZE):
+        chunk = byte_string[i:min(i + CHUNK_SIZE, len(byte_string))]
+        skt.send(chunk)
+
+# Function to receive a string over a socket with AES decryption
+def secure_receive_string(skt: socket, key: str) -> str:
+    # Receive the length of the string first
+    length = int(skt.recv(1024).decode('unicode_escape'))
+    skt.send(str(length).encode('unicode_escape'))
+
+    # Initialize an empty byte array to store the received data
+    byte_string = bytearray()
+
+    # Receive the string in chunks
+    while len(byte_string) < length:
+        chunk = skt.recv(min(CHUNK_SIZE, length - len(byte_string)))
+        if not chunk:
+            break
+        byte_string.extend(chunk)
+
+    # Decode the byte array to a string
+    ciphered_text = byte_string.decode('unicode_escape')
+    plain_text = aes.decrypt_ciphered_text(key, ciphered_text)
+    return plain_text
+
+# Receive any type of file over a socket connection
+def receive_file(skt: socket, key: str, save_directory: str='received') -> tuple[str, int]:
+    meta_data = secure_receive_string(skt, key)
+    file_size_str, file_name = meta_data.split('|', 2)
+
+    file_size = int(file_size_str)
+
+    # Create save path
+    os.makedirs(save_directory, exist_ok=True)
+    save_path = os.path.join(save_directory, file_name)
+    
+    # Receive file content and write to disk
+    with open(save_path, 'wb') as file:
+        bytes_received = 0
+        
+        while bytes_received < file_size:
+            # # Receive chunk
+            chunk_hex = secure_receive_string(skt, key)
+            
+            if not chunk_hex:
+                break
+            
+            # # Decode chunk from hex to bytes
+            chunk = bytes.fromhex(chunk_hex)
+            # # Write chunk and update counter
+            file.write(chunk)
+            bytes_received += len(chunk)
+
+            print(f"Received {bytes_received} bytes of {file_size} bytes")
+
+    return (file_name, file_size)
+
 def main():
     print("Here is Bob")
     # next create a socket object 
@@ -138,11 +212,19 @@ def main():
 
     key = derive_aes_key(R, key_length)
 
-    ciphered_text = receive_string(client_skt)
+    choice = secure_receive_string(client_skt, key)
+    print("Choice from Alice:", choice)
 
-    # Decrypt the ciphered text using AES
-    plain_text = aes.decrypt_ciphered_text(key, ciphered_text)
-    print("Text from Alice:", plain_text)
+    if choice == "file":
+        # Receive the file
+        file_name, file_size = receive_file(client_skt, key)
+        print(f"File received: {file_name} {file_size} bytes")
+    elif choice == "string":
+        # Receive and then decrypt the ciphered text using AES
+        plain_text = secure_receive_string(client_skt, key)
+        print("Text from Alice:", plain_text)
+    else:
+        print("Invalid choice. Exiting.")
 
     client_skt.close()
     skt.close()
