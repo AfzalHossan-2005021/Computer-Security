@@ -3,7 +3,7 @@ import socket
 import random
 import hashlib
 import _2005021_ecc as ecc
-import _2005021_aes as aes
+import _2005021_aes_ctr as aes
 
 SEED = 2005021
 CHUNK_SIZE = 4096
@@ -162,23 +162,11 @@ def send_file(skt: socket, file_path: str, key: str):
 
     # Send the header
     secure_send_string(skt, header, key)
+    print("Total bytes to send:", file_size)
 
-    # Send file content in chunks
-    with open(file_path, 'rb') as file:
-        bytes_sent = 0
-        
-        while bytes_sent < file_size:
-            # Read chunk and check if we reached EOF
-            chunk = file.read(min(CHUNK_SIZE, file_size - bytes_sent))
-
-            if not chunk:
-                break
-            
-            # Send the chunk (convert bytes to string for encryption)
-            chunk_str = chunk.hex()  # Convert binary data to hex string
-            secure_send_string(skt, chunk_str, key)
-            bytes_sent += len(chunk)
-            print(f"Sent {bytes_sent} bytes of {file_size} bytes")
+    # Wait for the server to be ready to receive the file
+    for chunk in aes.encrypt_file_in_chunks(key, file_path, CHUNK_SIZE):
+        skt.send(chunk)
 
 def main():
     print("Here is Alice")

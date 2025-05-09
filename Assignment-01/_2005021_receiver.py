@@ -2,7 +2,7 @@ import os
 import socket
 import hashlib
 import _2005021_ecc as ecc
-import _2005021_aes as aes
+import _2005021_aes_ctr as aes
 
 CHUNK_SIZE = 4096
 
@@ -163,24 +163,18 @@ def receive_file(skt: socket, key: str, save_directory: str='received') -> tuple
     os.makedirs(save_directory, exist_ok=True)
     save_path = os.path.join(save_directory, file_name)
     
-    # Receive file content and write to disk
-    with open(save_path, 'wb') as file:
-        bytes_received = 0
-        
-        while bytes_received < file_size:
-            # # Receive chunk
-            chunk_hex = secure_receive_string(skt, key)
-            
-            if not chunk_hex:
+    print("Total file size:", file_size)
+    
+    def receive_chunk_by_chunk(file_size: int):
+        remaining_bytes = int(2 * file_size)
+        while True:
+            chunk = skt.recv(min(CHUNK_SIZE, remaining_bytes))
+            if not chunk:
                 break
-            
-            # # Decode chunk from hex to bytes
-            chunk = bytes.fromhex(chunk_hex)
-            # # Write chunk and update counter
-            file.write(chunk)
-            bytes_received += len(chunk)
-
-            print(f"Received {bytes_received} bytes of {file_size} bytes")
+            remaining_bytes -= len(chunk)
+            yield chunk
+    # Decrypt and write the file in chunks
+    aes.decrypt_file_in_chunks(key, save_path, receive_chunk_by_chunk(file_size))
 
     return (file_name, file_size)
 
