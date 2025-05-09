@@ -480,70 +480,48 @@ if __name__ == "__main__":
     plain_text = input("Enter the plaintext: ")
 
     # Print the key and plaintext in ASCII and HEX
-    # key_bitvecotr = convet_string_to_bitvector(key)
-    # plain_text_bitvector = convet_string_to_bitvector(plain_text)
-    # print("Key:\nIn ASCII:", end=" ")
-    # print_bitvector_as_ascii(key_bitvecotr)
-    # print("In HEX:", end=" ")
-    # print_bitvector_as_hex(key_bitvecotr)
-    # print()
-    # print("Plain Text:\nIn ASCII:", end=" ")
-    # print_bitvector_as_ascii(plain_text_bitvector)
-    # print("In HEX:", end=" ")
-    # print_bitvector_as_hex(plain_text_bitvector)
-    # print()
+    key_bitvecotr = convet_string_to_bitvector(key)
+    plain_text_bitvector = convet_string_to_bitvector(plain_text)
+    print("Key:\nIn ASCII:", end=" ")
+    print_bitvector_as_ascii(key_bitvecotr)
+    print("In HEX:", end=" ")
+    print_bitvector_as_hex(key_bitvecotr)
+    print()
+    print("Plain Text:\nIn ASCII:", end=" ")
+    print_bitvector_as_ascii(plain_text_bitvector)
+    print("In HEX:", end=" ")
+    print_bitvector_as_hex(plain_text_bitvector)
+    print()
 
-    # # Encrypt the plaintext
-    # start_time = time.time()
-    # ciphered_text = encrypt_plain_text(key, plain_text)
-    # end_time = time.time()
-    # encryption_time = (end_time - start_time) * 1000
+    # Encrypt the plaintext
+    start_time = time.time()
+    ciphered_text = encrypt_plain_text(key, plain_text)
+    end_time = time.time()
+    encryption_time = (end_time - start_time) * 1000
 
-    # ciphered_text_bitvector = convet_string_to_bitvector(ciphered_text)
-    # print("Ciphered Text:\nIn HEX:", end=" ")
-    # print_bitvector_as_hex(ciphered_text_bitvector)
-    # print("In ASCII:", end=" ")
-    # print_bitvector_as_ascii(ciphered_text_bitvector)
-    # print()
+    ciphered_text_bitvector = convet_string_to_bitvector(ciphered_text)
+    print("Ciphered Text:\nIn HEX:", end=" ")
+    print_bitvector_as_hex(ciphered_text_bitvector)
+    print("In ASCII:", end=" ")
+    print_bitvector_as_ascii(ciphered_text_bitvector)
+    print()
     
-    # # Decrypt the ciphertext
-    # print("Deciphered Text:")
-    # start_time = time.time()
-    # deciphered_text = decrypt_ciphered_text(key, ciphered_text)
-    # end_time = time.time()
-    # decryption_time = (end_time - start_time) * 1000
+    # Decrypt the ciphertext
+    print("Deciphered Text:")
+    start_time = time.time()
+    deciphered_text = decrypt_ciphered_text(key, ciphered_text)
+    end_time = time.time()
+    decryption_time = (end_time - start_time) * 1000
 
-    # deciphered_text_bitvector = convet_string_to_bitvector(deciphered_text)
-    # print("In HEX:", end=" ")
-    # print_bitvector_as_hex(deciphered_text_bitvector)
-    # print("In ASCII:", end=" ")
-    # print_bitvector_as_ascii(deciphered_text_bitvector)
-    # print()
+    deciphered_text_bitvector = convet_string_to_bitvector(deciphered_text)
+    print("In HEX:", end=" ")
+    print_bitvector_as_hex(deciphered_text_bitvector)
+    print("In ASCII:", end=" ")
+    print_bitvector_as_ascii(deciphered_text_bitvector)
+    print()
     
-    # # Print the execution time details
-    # print("Execution Time Details:")
-    # print("Key Schedule Time: ", key_schedule_time, "ms")
-    # print("Encryption Time: ", encryption_time, "ms")
-    # print("Decryption Time: ", decryption_time, "ms")
-
-    byte_str = ''
-    with open("hello.txt", "rb") as file:
-        byte_str = file.read()
-    print("Byte String:", byte_str)
-
-    byte_str_BitVector = convet_bytes_to_bitvector(byte_str)
-    print(len(byte_str_BitVector))
-    print("Byte String BitVector:", byte_str_BitVector)
-    print(convet_bitvector_to_bytes(byte_str_BitVector))
-    print(type(plain_text))
-    print(type(byte_str))
-        
-    # print(byte_str.decode('utf-8'))
-    # byte_arr = bytes([0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06])
-    # # print(len(byte_arr[0]))
-    # print(byte_arr)
-    # for(i, byte) in enumerate(byte_arr):
-    #     print(f"Byte {i}: {sys.getsizeof(byte)} bits")
-    # str = bytes.decode(byte_arr)
-    # print(str)
-    # print(sys.getsizeof(BitVector(textstring='a')))
+    # Print the execution time details
+    print("Execution Time Details:")
+    print("Key Schedule Time: ", key_schedule_time, "ms")
+    print("Encryption Time: ", encryption_time, "ms")
+    print("Decryption Time: ", decryption_time, "ms")
