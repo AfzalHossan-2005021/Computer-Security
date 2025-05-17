@@ -1,0 +1,2 @@
+gcc -m32 -z execstack -fno-stack-protector B1.c
+`pwd`/a.out
