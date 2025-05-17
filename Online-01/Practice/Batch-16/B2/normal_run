@@ -1,0 +1,8 @@
+#!/bin/bash
+
+sudo gcc -m32 -z execstack -fno-stack-protector B2.c
+
+sudo chown root a.out
+sudo chmod 4755 a.out
+
+`pwd`/a.out
