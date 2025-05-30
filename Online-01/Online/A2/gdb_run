@@ -1,0 +1,14 @@
+#!/bin/bash
+
+# Stop vartual address randomization
+echo 0 | sudo tee /proc/sys/kernel/randomize_va_space
+
+# Set the source file and binary name
+SRC="A2.c"
+BINARY="./a.out"
+
+# Compile the C file with debug symbols
+gcc -m32 -g -z execstack -no-pie -fno-stack-protector "$SRC"
+
+# Extract the base pointer (ebp for 32-bit binary)
+gdb -q -ex "set environment _=$(pwd)/a.out" -ex "unset environment LINES" -ex "unset environment COLUMNS" -ex "break vuln" -ex "run" "$BINARY"
