@@ -1,5 +1,10 @@
-from flask import Flask, send_from_directory
-# additional imports
+import io
+import uuid
+import base64
+import numpy as np
+import matplotlib.pyplot as plt
+from datetime import datetime
+from flask import Flask, send_from_directory, request, jsonify
 
 app = Flask(__name__)
 
@@ -16,24 +21,64 @@ def static_files(path):
 
 @app.route('/collect_trace', methods=['POST'])
 def collect_trace():
-    """ 
-    Implement the collect_trace endpoint to receive trace data from the frontend and generate a heatmap.
-    1. Receive trace data from the frontend as JSON
-    2. Generate a heatmap using matplotlib
-    3. Store the heatmap and trace data in the backend temporarily
-    4. Return the heatmap image and optionally other statistics to the frontend
-    """
+    try:
+        data = request.get_json()
+        
+        id = str(uuid.uuid4())
+        trace_data = data['trace_data']
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        # Calculate stats
+        min_val = int(np.min(trace_data))
+        max_val = int(np.max(trace_data))
+        range_val = int(np.ptp(trace_data))
+        samples = len(trace_data)
+        
+        # Create stats dictionary with both individual values and formatted string
+        stats = {
+            'min': min_val,
+            'max': max_val,
+            'range': range_val,
+            'samples': samples,
+            'formatted': f"Min: {min_val}, Max: {max_val}, Range: {range_val}, Samples: {samples}"
+        }
+
+        stored_traces.append(trace_data)
+
+        trace_array = np.array(trace_data, dtype=float).reshape(1, -1)
+
+        plt.figure(figsize=(20, 2))  # Increased image size from (10, 1.5) to (20, 3)
+        plt.imshow(trace_array, aspect='auto', cmap='plasma', vmin=min(trace_data), vmax=max(trace_data))
+        plt.axis('off')
+
+        buffer = io.BytesIO()
+        plt.savefig(buffer, format='png', bbox_inches='tight', facecolor="#ffffff")
+        plt.close()
+        buffer.seek(0)
+
+        img_str = base64.b64encode(buffer.getvalue()).decode('utf-8')
+
+        heatmap = {
+            'id': id,
+            'timestamp': timestamp,
+            'image': img_str,
+            'stats': stats
+        }
+        stored_heatmaps.append(heatmap)
+
+        return jsonify(heatmap)
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/clear_results', methods=['POST'])
 def clear_results():
-    """ 
-    Implment a clear results endpoint to reset stored data.
-    1. Clear stored traces and heatmaps
-    2. Return success/error message
-    """
-
-
-# Additional endpoints can be implemented here as needed.
+    try:
+        global stored_traces, stored_heatmaps
+        stored_traces = []
+        stored_heatmaps = []
+        return '', 204
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
