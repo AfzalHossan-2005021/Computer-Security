@@ -1,7 +1,7 @@
-/* Find the cache line size by running `getconf -a | grep CACHE` */
 /**
  * Constants
- */
+*/
+/* Find the cache line size by running `getconf -a | grep CACHE` */
 const LINESIZE = 64;          // Cache line size in bytes
 const NUM_MEASUREMENTS = 10;  // Number of measurements to take for reliability
 
@@ -18,12 +18,12 @@ function readNlines(n) {
 
   // 2. Read each cache line (read the buffer in steps of LINESIZE) 10 times.
   const times = [];
-  for (let i = 0; i < NUM_MEASUREMENTS; i++) {
+  for (let read = 0; read < NUM_MEASUREMENTS; read++) {
 
     // 3. Collect total time taken in an array using `performance.now()`.
     const start = performance.now();
-    for (let j = 0; j < bufferSize; j += LINESIZE) {
-      buffer[j];
+    for (let index = 0; index < bufferSize; index += LINESIZE) {
+      buffer[index];
     }
     const end = performance.now();
     times.push(end - start);
@@ -42,7 +42,13 @@ self.addEventListener("message", function (e) {
 
     /* Call the readNlines function for n = 1, 10, ... 10,000,000 and store the result */
     for (let n = 1; n <= 10000000; n *= 10) {
-      results[n] = readNlines(n);
+      try {
+        results[n] = readNlines(n);
+      } catch (err) {
+        // If readNlines fails for any n, break the loop
+        console.error(`Error when measuring with n=${n}:`, err);
+        break;
+      }
     }
 
     self.postMessage(results);
