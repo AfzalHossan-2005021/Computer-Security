@@ -25,7 +25,41 @@
         .results-table {
             margin: 0 auto;
             width: 100%;
-        }        
+        }
+        
+        .heatmap-gallery {
+            margin-top: 2rem;
+        }
+        
+        .heatmaps-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(700px, 1fr));
+            gap: 2rem;
+            margin-top: 1rem;
+        }
+        
+        .heatmap-card {
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            padding: 1rem;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        
+        .stats {
+            font-size: 1rem;
+            display: flex;
+            flex-direction: row;
+            flex-wrap: nowrap;
+            margin-top: 0.8rem;
+            border-radius: 4px;
+        }
+        
+        .stats p {
+            margin: 0;
+            letter-spacing: 0.03em;
+            font-family: monospace;
+            font-size: 1.05rem;
+        }
     </style>
 </head>
 <body>
@@ -34,9 +68,10 @@
         
         <div class="button-group">
             <button @click="collectLatencyData()" :disabled="isCollecting">Collect Latency Data</button>
-            <!--Implement Collect Trace button. It should call collectTraceData(). -->
-            <!--Implement Download Traces button. It should call downloadTraces(). -->
-            <!--Implement Clear Results button. It should call clearResults(). -->
+            <button @click="collectTraceData()" :disabled="isCollecting">Collect Trace</button>
+            <button @click="downloadTraces()" :disabled="traceData.length == 0">Download Traces</button>
+            <button>Refresh results</button>
+            <button @click="clearResults()" :disabled="traceData.length == 0">Clear Results</button>
         </div>
         
         <div x-show="status" role="alert" x-text="status" 
@@ -66,14 +101,39 @@
         </template>
         
         <!-- Heatmap gallery for all traces -->
-        <!-- Implement UI for showing a list of heatmaps fetched from the server -->
+        <template x-if="heatmaps.length > 0 && showingTraces">
+            <div class="heatmap-gallery">
+                <h3>Trace Heatmaps</h3>
+                <div class="heatmaps-container">
+                    <template x-for="(heatmap, index) in heatmaps" :key="heatmap.id">
+                        <div class="heatmap-card">
+                            <h4 x-text="'Trace #' + (index + 1) + ' - ' + heatmap.timestamp"></h4>
+                            <img :src="'data:image/png;base64,' + heatmap.image" alt="Cache Access Heatmap" style="max-width: 100%;">
+                            <div class="stats" x-show="heatmap.stats">
+                                <p x-text="heatmap.stats.formatted"></p>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+        </template>
     </main>
 
     <script src="index.js"></script>
     <script>
-        // Initialize app by fetching existing results when page loads
+        // Initialize app by registering it as an Alpine data component
         document.addEventListener('alpine:init', () => {
-            window.Alpine.store('app').fetchResults();
+            window.Alpine.data('app', app);
+        });
+        
+        // Listen for Alpine being ready on the page
+        document.addEventListener('alpine:initialized', () => {
+            // Use a safe way to call fetchResults after Alpine is fully initialized
+            setTimeout(() => {
+                // Create a temporary event to run fetchResults on the component
+                const event = new CustomEvent('fetch-results');
+                document.dispatchEvent(event);
+            }, 200);
         });
     </script>
 </body>
