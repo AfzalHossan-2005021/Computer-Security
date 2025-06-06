@@ -78,14 +78,14 @@ function app() {
         });
 
         // Update results
-        this.traceData.push(results);
+        this.traceData = results;
         this.status = "Collecting trace complete, sending to server...";
 
         // Send data to the backend
         const response = await fetch('/collect_trace', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ 'trace_data': results }),
+          body: JSON.stringify({ 'trace_data': this.traceData }),
         });
 
         if (!response.ok) {
@@ -95,10 +95,8 @@ function app() {
         const data = await response.json();
 
         // Add the new heatmap to the collection
-        if (data.image) {
-          this.heatmaps.push(data);
-          this.status = "Trace data collected and visualized using matplotlib.";
-        }
+        this.heatmaps.push(data.heatmap)
+        this.status = "Trace data collected and visualized using matplotlib.";
 
         // Terminate worker
         worker.terminate();
@@ -142,7 +140,7 @@ function app() {
         setTimeout(() => {
           document.body.removeChild(a);
           URL.revokeObjectURL(url);
-          this.status = "Download complete!";
+          this.status = "Downloaded";
           setTimeout(() => { this.status = ""; }, 2000);
         }, 100);
       } catch (error) {
@@ -176,7 +174,7 @@ function app() {
         this.heatmaps = [];
         this.latencyResults = null;
         this.showingTraces = false;
-        this.status = "All results cleared!";
+        this.status = "Cleared";
         setTimeout(() => { this.status = ""; }, 2000);
       } catch (error) {
         console.error("Error clearing results:", error);

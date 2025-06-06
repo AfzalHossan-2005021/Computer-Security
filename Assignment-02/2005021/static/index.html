@@ -67,11 +67,11 @@
         <h1>CSE406: Website Fingerprinting</h1>
         
         <div class="button-group">
-            <button @click="collectLatencyData()" :disabled="isCollecting">Collect Latency Data</button>
-            <button @click="collectTraceData()" :disabled="isCollecting">Collect Trace</button>
-            <button @click="downloadTraces()" :disabled="traceData.length == 0">Download Traces</button>
+            <button @click="collectLatencyData()" :disabled="isCollecting">Collect latency data</button>
+            <button @click="collectTraceData()" :disabled="isCollecting">Collect trace</button>
+            <button @click="downloadTraces()" :disabled="traceData.length == 0">Download traces</button>
             <button>Refresh results</button>
-            <button @click="clearResults()" :disabled="traceData.length == 0">Clear Results</button>
+            <button @click="clearResults()" :disabled="traceData.length == 0">Clear all results</button>
         </div>
         
         <div x-show="status" role="alert" x-text="status" 
@@ -110,7 +110,7 @@
                             <h4 x-text="'Trace #' + (index + 1) + ' - ' + heatmap.timestamp"></h4>
                             <img :src="'data:image/png;base64,' + heatmap.image" alt="Cache Access Heatmap" style="max-width: 100%;">
                             <div class="stats" x-show="heatmap.stats">
-                                <p x-text="heatmap.stats.formatted"></p>
+                                <p x-text="heatmap.stats"></p>
                             </div>
                         </div>
                     </template>

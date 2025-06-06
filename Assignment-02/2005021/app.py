@@ -34,24 +34,19 @@ def collect_trace():
         samples = len(trace_data)
         
         # Create stats dictionary with both individual values and formatted string
-        stats = {
-            'min': min_val,
-            'max': max_val,
-            'range': range_val,
-            'samples': samples,
-            'formatted': f"Min: {min_val}, Max: {max_val}, Range: {range_val}, Samples: {samples}"
-        }
+        stats = f"Min: {min_val}, Max: {max_val}, Range: {range_val}, Samples: {samples}"
 
         stored_traces.append(trace_data)
 
         trace_array = np.array(trace_data, dtype=float).reshape(1, -1)
 
-        plt.figure(figsize=(20, 2))  # Increased image size from (10, 1.5) to (20, 3)
+        plt.figure(figsize=(20, 2))
         plt.imshow(trace_array, aspect='auto', cmap='plasma', vmin=min(trace_data), vmax=max(trace_data))
         plt.axis('off')
 
         buffer = io.BytesIO()
-        plt.savefig(buffer, format='png', bbox_inches='tight', facecolor="#ffffff")
+        # Increase bbox with padding
+        plt.savefig(buffer, format='png', bbox_inches='tight', pad_inches=0.25, facecolor="#ffffff")
         plt.close()
         buffer.seek(0)
 
@@ -65,8 +60,15 @@ def collect_trace():
         }
         stored_heatmaps.append(heatmap)
 
-        return jsonify(heatmap)
+        return jsonify({'heatmap': heatmap}), 200
 
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/get_results', methods=['GET'])
+def get_results():
+    try:
+        return jsonify({'traces': stored_traces}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
