@@ -217,9 +217,6 @@ def collect_fingerprints(driver, target_counts=None):
     # Use a longer timeout for page loading operations
     wait = WebDriverWait(driver, 20)
     total_new_traces = 0
-    collection_attempts = 0
-    max_failed_attempts = 5
-    consecutive_failures = 0
     
     # Round-robin collection across websites to distribute failures
     # Create a list of (website, remaining_count) tuples for active collection
@@ -236,11 +233,9 @@ def collect_fingerprints(driver, target_counts=None):
         
         # Try to collect a trace
         success = collect_single_trace(driver, wait, website_url)
-        collection_attempts += 1
         
         # Check for trace collection status
         if success:
-            consecutive_failures = 0  # Reset consecutive failures counter on success
             remaining_traces -= 1
             
             # Save the newly collected traces
@@ -257,6 +252,7 @@ def collect_fingerprints(driver, target_counts=None):
                 # Clear traces after saving to avoid duplicates
                 clear_trace_results(driver, wait)
         else:
+            print(f"  - Failed to collect trace for {website_url}")
             break  # Stop collection if a trace could not be collected
         
         # If we still need more traces for this website, add it back to the queue
@@ -264,9 +260,6 @@ def collect_fingerprints(driver, target_counts=None):
             collection_queue.append((website_url, remaining_traces))
         
     print(f"Collection finished with {total_new_traces} new traces")
-    
-    if consecutive_failures >= max_failed_attempts:
-        print(f"Warning: Stopped collection after {max_failed_attempts} consecutive failures")
     
     return total_new_traces
 
