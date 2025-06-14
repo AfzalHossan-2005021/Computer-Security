@@ -128,6 +128,25 @@ class ComplexFingerprintClassifier(nn.Module):
         return x
 
 
+class TransformerFingerprintClassifier(nn.Module):
+    """1D Transformer Encoder for website fingerprinting."""
+    def __init__(self, input_size, hidden_size, num_classes, nhead=4, num_layers=2):
+        super(TransformerFingerprintClassifier, self).__init__()
+        self.input_proj = nn.Linear(input_size, hidden_size)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=hidden_size, nhead=nhead, batch_first=True)
+        self.transformer = nn.TransformerEncoder(encoder_layer, num_layers=num_layers)
+        self.dropout = nn.Dropout(0.5)
+        self.fc = nn.Linear(hidden_size, num_classes)
+    def forward(self, x):
+        # x: (batch, input_size)
+        x = self.input_proj(x)  # (batch, hidden_size)
+        x = x.unsqueeze(1)      # (batch, seq_len=1, hidden_size)
+        x = self.transformer(x) # (batch, seq_len=1, hidden_size)
+        x = x.squeeze(1)        # (batch, hidden_size)
+        x = self.dropout(x)
+        x = self.fc(x)
+        return x
+
 
 def train(model, train_loader, test_loader, criterion, optimizer, epochs, model_save_path):
     """Train a PyTorch model and evaluate on the test set.
@@ -311,7 +330,8 @@ def main():
     num_classes = len(dataset.website_names)
     models = {
         'basic_cnn': FingerprintClassifier(INPUT_SIZE, HIDDEN_SIZE, num_classes),
-        'complex_cnn': ComplexFingerprintClassifier(INPUT_SIZE, HIDDEN_SIZE, num_classes)
+        'complex_cnn': ComplexFingerprintClassifier(INPUT_SIZE, HIDDEN_SIZE, num_classes),
+        'transformer': TransformerFingerprintClassifier(INPUT_SIZE, HIDDEN_SIZE, num_classes)
     }
 
     # 5. Train and evaluate each model
