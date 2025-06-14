@@ -316,19 +316,24 @@ def main():
 
     # 5. Train and evaluate each model
     results = {}
+    best_model = None
+    best_acc = 0.0
+    best_model_name = None
     for name, model in models.items():
         print(f"\nTraining {name}...")
         criterion = nn.CrossEntropyLoss()
         optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
         model_save_path = os.path.join(MODELS_DIR, f"{name}.pth")
-        best_acc = train(model, train_loader, test_loader, criterion, optimizer, EPOCHS, model_save_path)
-        results[name] = best_acc
-        
-        # Load model and evaluate
-        print(f"\nEvaluating {name}...")
-        model.load_state_dict(torch.load(model_save_path, map_location=torch.device('cpu')))
-        evaluate(model, test_loader, dataset.website_names)
-    
+        acc = train(model, train_loader, test_loader, criterion, optimizer, EPOCHS, model_save_path)
+        results[name] = acc
+        if acc > best_acc:
+            best_acc = acc
+            best_model = model
+            best_model_name = name
+    # Save the best model as model.pth (in addition to individual model files)
+    if best_model is not None:
+        torch.save(best_model.state_dict(), "model.pth")
+        print(f"\nBest model '{best_model_name}' also saved as 'model.pth' with accuracy: {best_acc*100:.2f}%")
     # 6. Print comparison of results
     print("\nModel comparison:")
     for name, acc in results.items():
