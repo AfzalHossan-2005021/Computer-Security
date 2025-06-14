@@ -70,8 +70,8 @@
             <button @click="collectLatencyData()" :disabled="isCollecting">Collect latency data</button>
             <button @click="collectTraceData()" :disabled="isCollecting">Collect trace</button>
             <button @click="downloadTraces()" :disabled="traceData.length == 0">Download traces</button>
-            <button>Refresh results</button>
             <button @click="clearResults()" :disabled="traceData.length == 0">Clear all results</button>
+            <button @click="predictWebsite()" :disabled="isCollecting">Predict Website (Real-Time)</button>
         </div>
         
         <div x-show="status" role="alert" x-text="status" 

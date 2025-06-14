@@ -182,5 +182,42 @@ function app() {
         this.statusIsError = true;
       }
     },
+
+    /*
+     * Real-time website prediction
+     * 1. Collect a trace
+     * 2. Send to /api/predict
+     * 3. Show prediction in UI
+     */
+    async predictWebsite() {
+      this.status = "Collecting trace for prediction...";
+      this.isCollecting = true;
+      this.statusIsError = false;
+      try {
+        let worker = new Worker("worker.js");
+        const results = await new Promise((resolve) => {
+          worker.onmessage = (e) => resolve(e.data);
+          worker.postMessage("start");
+        });
+        worker.terminate();
+        // Send to backend for prediction
+        const response = await fetch('/api/predict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 'trace_data': results }),
+        });
+        if (!response.ok) {
+          throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+        }
+        const data = await response.json();
+        this.status = `Predicted website: ${data.predicted_website}`;
+      } catch (error) {
+        console.error("Error predicting website:", error);
+        this.status = `Error: ${error.message}`;
+        this.statusIsError = true;
+      } finally {
+        this.isCollecting = false;
+      }
+    },
   };
 }
