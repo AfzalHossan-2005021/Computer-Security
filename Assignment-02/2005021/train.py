@@ -254,6 +254,37 @@ def evaluate(model, test_loader, website_names):
     return all_preds, all_labels
 
 
+class TraceDataset(Dataset):
+    """Custom Dataset for loading website fingerprinting traces from JSON."""
+    def __init__(self, json_path, input_size, normalize=True):
+        with open(json_path, 'r') as f:
+            self.data = json.load(f)
+        self.input_size = input_size
+        self.normalize = normalize
+        self.traces = []
+        self.labels = []
+        self.websites = []
+        for entry in self.data:
+            trace = entry['trace_data'][:input_size]
+            if len(trace) < input_size:
+                trace = trace + [0] * (input_size - len(trace))
+            self.traces.append(trace)
+            self.labels.append(entry['website_index'])
+            self.websites.append(entry['website'])
+        self.traces = np.array(self.traces, dtype=np.float32)
+        self.labels = np.array(self.labels, dtype=np.int64)
+        self.website_names = [w for i, w in sorted(set(zip(self.labels, self.websites)))]
+        # Normalize if needed
+        if self.normalize:
+            self.mean = self.traces.mean()
+            self.std = self.traces.std()
+            self.traces = (self.traces - self.mean) / (self.std + 1e-8)
+    def __len__(self):
+        return len(self.traces)
+    def __getitem__(self, idx):
+        return torch.tensor(self.traces[idx]), torch.tensor(self.labels[idx])
+
+
 def main():
     """ Implement the main function to train and evaluate the models.
     1. Load the dataset from the JSON file, probably using a custom Dataset class
@@ -263,6 +294,45 @@ def main():
     5. Train and evaluate each model
     6. Print comparison of results
     """
+    # 1. Load dataset using a custom Dataset class
+    dataset = TraceDataset(DATASET_PATH, INPUT_SIZE, normalize=True)
+
+    # 2. Stratified split
+    sss = StratifiedShuffleSplit(n_splits=1, test_size=1-TRAIN_SPLIT, random_state=42)
+    train_idx, test_idx = next(sss.split(np.zeros(len(dataset)), dataset.labels))   # Use dummy X (np.zeros) since only y is used for stratification
+    train_set = Subset(dataset, train_idx)
+    test_set = Subset(dataset, test_idx)
+
+    # 3. DataLoaders
+    train_loader = DataLoader(train_set, batch_size=BATCH_SIZE, shuffle=True)
+    test_loader = DataLoader(test_set, batch_size=BATCH_SIZE, shuffle=False)
+
+    # 4. Define models
+    num_classes = len(dataset.website_names)
+    models = {
+        'basic_cnn': FingerprintClassifier(INPUT_SIZE, HIDDEN_SIZE, num_classes),
+        'complex_cnn': ComplexFingerprintClassifier(INPUT_SIZE, HIDDEN_SIZE, num_classes)
+    }
+
+    # 5. Train and evaluate each model
+    results = {}
+    for name, model in models.items():
+        print(f"\nTraining {name}...")
+        criterion = nn.CrossEntropyLoss()
+        optimizer = optim.Adam(model.parameters(), lr=LEARNING_RATE)
+        model_save_path = os.path.join(MODELS_DIR, f"{name}.pth")
+        best_acc = train(model, train_loader, test_loader, criterion, optimizer, EPOCHS, model_save_path)
+        results[name] = best_acc
+        
+        # Load model and evaluate
+        print(f"\nEvaluating {name}...")
+        model.load_state_dict(torch.load(model_save_path, map_location=torch.device('cpu')))
+        evaluate(model, test_loader, dataset.website_names)
+    
+    # 6. Print comparison of results
+    print("\nModel comparison:")
+    for name, acc in results.items():
+        print(f"{name}: {acc*100:.2f}% accuracy")
 
 if __name__ == "__main__":
     main()
