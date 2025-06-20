@@ -148,6 +148,78 @@ class TransformerFingerprintClassifier(nn.Module):
         return x
 
 
+class CNNLSTMClassifier(nn.Module):
+    """Hybrid 1D CNN + LSTM classifier for sequence data."""
+    def __init__(self, input_size, hidden_size, num_classes, lstm_hidden=128, lstm_layers=1):
+        super(CNNLSTMClassifier, self).__init__()
+        self.conv1 = nn.Conv1d(1, 32, kernel_size=5, stride=1, padding=2)
+        self.bn1 = nn.BatchNorm1d(32)
+        self.pool1 = nn.MaxPool1d(2)
+        self.conv2 = nn.Conv1d(32, 64, kernel_size=3, stride=1, padding=1)
+        self.bn2 = nn.BatchNorm1d(64)
+        self.pool2 = nn.MaxPool1d(2)
+        # After two 2x pooling: seq_len = input_size // 4, channels = 64
+        self.lstm_seq_len = input_size // 4
+        self.lstm_input_size = 64
+        self.lstm = nn.LSTM(input_size=self.lstm_input_size, hidden_size=lstm_hidden, num_layers=lstm_layers, batch_first=True, bidirectional=True)
+        self.dropout = nn.Dropout(0.5)
+        self.fc = nn.Linear(lstm_hidden * 2, num_classes)
+        self.relu = nn.ReLU()
+    def forward(self, x):
+        x = x.unsqueeze(1)  # (batch, 1, input_size)
+        x = self.relu(self.bn1(self.conv1(x)))
+        x = self.pool1(x)
+        x = self.relu(self.bn2(self.conv2(x)))
+        x = self.pool2(x)
+        # x: (batch, channels=64, seq_len=input_size//4)
+        x = x.permute(0, 2, 1)  # (batch, seq_len, channels)
+        lstm_out, _ = self.lstm(x)
+        out = lstm_out[:, -1, :]  # Take last output
+        out = self.dropout(out)
+        out = self.fc(out)
+        return out
+
+
+class CNNBiLSTMAttentionClassifier(nn.Module):
+    """Deeper CNN + Bidirectional LSTM with Attention for sequence classification."""
+    def __init__(self, input_size, hidden_size, num_classes, lstm_hidden=128, lstm_layers=2):
+        super(CNNBiLSTMAttentionClassifier, self).__init__()
+        self.conv1 = nn.Conv1d(1, 64, kernel_size=5, stride=1, padding=2)
+        self.bn1 = nn.BatchNorm1d(64)
+        self.pool1 = nn.MaxPool1d(2)
+        self.conv2 = nn.Conv1d(64, 128, kernel_size=3, stride=1, padding=1)
+        self.bn2 = nn.BatchNorm1d(128)
+        self.pool2 = nn.MaxPool1d(2)
+        self.conv3 = nn.Conv1d(128, 256, kernel_size=3, stride=1, padding=1)
+        self.bn3 = nn.BatchNorm1d(256)
+        self.pool3 = nn.MaxPool1d(2)
+        # After three 2x pooling: seq_len = input_size // 8, channels = 256
+        self.lstm_seq_len = input_size // 8
+        self.lstm_input_size = 256
+        self.bilstm = nn.LSTM(input_size=self.lstm_input_size, hidden_size=lstm_hidden, num_layers=lstm_layers, batch_first=True, bidirectional=True)
+        self.attention = nn.Linear(lstm_hidden * 2, 1)
+        self.dropout = nn.Dropout(0.5)
+        self.fc = nn.Linear(lstm_hidden * 2, num_classes)
+        self.relu = nn.ReLU()
+    def forward(self, x):
+        x = x.unsqueeze(1)  # (batch, 1, input_size)
+        x = self.relu(self.bn1(self.conv1(x)))
+        x = self.pool1(x)
+        x = self.relu(self.bn2(self.conv2(x)))
+        x = self.pool2(x)
+        x = self.relu(self.bn3(self.conv3(x)))
+        x = self.pool3(x)
+        # x: (batch, channels=256, seq_len=input_size//8)
+        x = x.permute(0, 2, 1)  # (batch, seq_len, channels)
+        lstm_out, _ = self.bilstm(x)  # (batch, seq_len, hidden*2)
+        # Attention mechanism
+        attn_weights = torch.softmax(self.attention(lstm_out), dim=1)  # (batch, seq_len, 1)
+        context = torch.sum(attn_weights * lstm_out, dim=1)  # (batch, hidden*2)
+        out = self.dropout(context)
+        out = self.fc(out)
+        return out
+
+
 def train(model, train_loader, test_loader, criterion, optimizer, epochs, model_save_path):
     """Train a PyTorch model and evaluate on the test set.
     Args:
@@ -331,7 +403,9 @@ def main():
     models = {
         'basic_cnn': FingerprintClassifier(INPUT_SIZE, HIDDEN_SIZE, num_classes),
         'complex_cnn': ComplexFingerprintClassifier(INPUT_SIZE, HIDDEN_SIZE, num_classes),
-        'transformer': TransformerFingerprintClassifier(INPUT_SIZE, HIDDEN_SIZE, num_classes)
+        'transformer': TransformerFingerprintClassifier(INPUT_SIZE, HIDDEN_SIZE, num_classes),
+        'cnn_lstm': CNNLSTMClassifier(INPUT_SIZE, HIDDEN_SIZE, num_classes),
+        'cnn_bilstm_attention': CNNBiLSTMAttentionClassifier(INPUT_SIZE, HIDDEN_SIZE, num_classes)
     }
 
     # 5. Train and evaluate each model

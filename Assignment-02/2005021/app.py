@@ -7,7 +7,7 @@ from datetime import datetime
 from flask import Flask, send_from_directory, request, jsonify
 import torch
 import json
-from train import FingerprintClassifier, ComplexFingerprintClassifier, INPUT_SIZE, HIDDEN_SIZE
+from train import CNNBiLSTMAttentionClassifier , INPUT_SIZE, HIDDEN_SIZE
 
 app = Flask(__name__)
 
@@ -17,17 +17,22 @@ stored_heatmaps = []
 
 # You may need to adjust this import if your normalization params are saved elsewhere
 def load_model(model_path, num_classes):
-    model = FingerprintClassifier(INPUT_SIZE, HIDDEN_SIZE, num_classes)
+    model = CNNBiLSTMAttentionClassifier(INPUT_SIZE, HIDDEN_SIZE, num_classes)
     model.load_state_dict(torch.load(model_path, map_location=torch.device('cpu')))
     model.eval()
     return model
 
-def preprocess_trace(trace, input_size, mean, std):
+def preprocess_trace(trace, input_size, min, max, mean, std):
     # Pad or truncate
     trace = trace[:input_size]
     if len(trace) < input_size:
         trace = trace + [0] * (input_size - len(trace))
     arr = np.array(trace, dtype=np.float32)
+
+    # min-max normalization
+    arr = (arr - min) / (max - min + 1e-8)  # Avoid division by zero
+
+    # Standardize the array 
     arr = (arr - mean) / (std + 1e-8)
     return torch.tensor(arr).unsqueeze(0)  # shape: (1, input_size)
 
@@ -38,16 +43,15 @@ with open('dataset.json', 'r') as f:
 website_map = sorted(set((entry['website_index'], entry['website']) for entry in data))
 website_names = [w for i, w in website_map]
 
-# Compute normalization params (mean, std) from all traces
-all_traces = []
-for entry in data:
-    trace = entry['trace_data'][:1000]
-    if len(trace) < 1000:
-        trace = trace + [0] * (1000 - len(trace))
-    all_traces.append(trace)
-all_traces = np.array(all_traces, dtype=np.float32)
-mean = all_traces.mean()
-std = all_traces.std()
+# Load normalization params from files
+with open('trace_minmax.json', 'r') as f:
+    minmax = json.load(f)
+    min_val = minmax['min']
+    max_val = minmax['max']
+
+npz = np.load('normalization_params.npz')
+mean = float(npz['mean'])
+std = float(npz['std'])
 
 # Load model (choose your best model)
 MODEL_PATH = 'model.pth'
@@ -129,7 +133,7 @@ def predict_website():
     try:
         data = request.get_json()
         trace = data['trace_data']
-        x = preprocess_trace(trace, 1000, mean, std)
+        x = preprocess_trace(trace, 1000, min_val, max_val, mean, std)
         with torch.no_grad():
             logits = model(x)
             pred = int(torch.argmax(logits, dim=1).item())
