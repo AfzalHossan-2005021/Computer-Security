@@ -120,15 +120,25 @@ function app() {
       try {
         this.status = "Preparing download...";
         this.statusIsError = false;
-        // Use the current trace data in memory
-        if (!this.traceData || this.traceData.length === 0) {
+
+        // Fetch the latest data
+        const response = await fetch('/api/get_results', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (!response.ok) {
+          throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+        }
+
+        const jsonData = await response.json()
+        
+        if (!jsonData.traces || jsonData.traces.length === 0) {
           this.status = "No trace data available to download!";
           setTimeout(() => { this.status = ""; }, 2000);
           return;
         }
         // Create a JSON blob
-        const jsonData = JSON.stringify(this.traceData);
-        const blob = new Blob([jsonData], { type: 'application/json' });
+        const blob = new Blob([JSON.stringify(jsonData)], { type: 'application/json' });
         const url = URL.createObjectURL(blob);
         // Create a download link
         const a = document.createElement('a');
