@@ -36,22 +36,20 @@ def preprocess_trace(trace, input_size, min, max, mean, std):
     arr = (arr - mean) / (std + 1e-8)
     return torch.tensor(arr).unsqueeze(0)  # shape: (1, input_size)
 
+# Define the list of website names
+website_names = [
+    # websites of your choice
+    "https://cse.buet.ac.bd/moodle/",
+    "https://google.com",
+    "https://prothomalo.com",
+]
 
-# Load website names and normalization params from dataset.json
-with open('dataset.json', 'r') as f:
-    data = json.load(f)
-website_map = sorted(set((entry['website_index'], entry['website']) for entry in data))
-website_names = [w for i, w in website_map]
+# Load normalization params
+min_val = 15.0
+max_val = 138.0
+mean = 0.9393821954727173
+std = 0.05894821882247925
 
-# Load normalization params from files
-with open('trace_minmax.json', 'r') as f:
-    minmax = json.load(f)
-    min_val = minmax['min']
-    max_val = minmax['max']
-
-npz = np.load('normalization_params.npz')
-mean = float(npz['mean'])
-std = float(npz['std'])
 
 # Load model (choose your best model)
 MODEL_PATH = 'model.pth'
