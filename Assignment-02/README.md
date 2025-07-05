@@ -33,7 +33,7 @@ pip install --upgrade pip
 # Install the following packages in this specific order
 pip install setuptools wheel
 pip install flask matplotlib numpy
-pip install selenium==4.15.0 webdriver-manager==4.0.1
+pip install selenium webdriver-manager
 pip install torch scikit-learn sqlalchemy
 ```
 
@@ -59,6 +59,34 @@ python app.py
 
 This will start the Flask application on `http://127.0.0.1:5000`.
 
+### 4. Data Collection Process
+
+The project includes a data collection script to gather website fingerprints:
+
+```bash
+# Make sure the Flask app is running in a separate terminal
+python collect.py
+```
+
+The collection script:
+- Opens each website in the predefined WEBSITES list
+- Collects browser timing data
+- Stores the data in a SQLite database
+- Saves the dataset to a JSON file
+
+### 5. Training the Model
+
+After data collection, you can train the fingerprinting model:
+
+```bash
+# Make sure you have collected data first
+python train.py
+```
+
+This will:
+- Load the dataset
+- Train a neural network model to identify websites based on timing data
+- Save the trained model to the "saved_models" directory
 
 ## Project Structure
 
@@ -104,3 +132,18 @@ If Selenium can't find the Chrome driver:
    driver = webdriver.Chrome(service=Service('/path/to/chromedriver'))
    ```
 
+### Database Access Issues
+
+If you encounter database access errors:
+
+1. Make sure the database file (`webfingerprint.db`) has the correct permissions
+2. Try deleting the existing database and let the application create a new one:
+   ```bash
+   rm webfingerprint.db
+   ```
+
+## Additional Notes
+
+- Make sure to run the Flask app first before running collection or training scripts
+- The model training can take a significant amount of time depending on your hardware
+- Adjust the number of traces collected per website in `collect.py` if needed
