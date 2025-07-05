@@ -1,0 +1,11 @@
+#!/bin/bash
+
+# Set the source file and binary name
+SRC="A1.c"
+BINARY="./a.out"
+
+# Compile the C file with debug symbols
+gcc -m32 -g -z execstack -fno-stack-protector "$SRC"
+
+# Extract the base pointer (ebp for 32-bit binary)
+gdb -q -ex "set environment _=$(pwd)/a.out" -ex "unset environment LINES" -ex "unset environment COLUMNS" -ex "break vuln" -ex "run" "$BINARY"
